@@ -138,6 +138,9 @@ def get_holdings_dataframe(fund_id: str) -> pd.DataFrame:
 
     df = pd.DataFrame(summary['holdings'])
 
+    if df.empty:
+        return pd.DataFrame()
+
     # Calculate weight
     total_value = summary['total_value']
     if total_value > 0:

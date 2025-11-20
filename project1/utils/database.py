@@ -112,12 +112,30 @@ def init_database():
             )
         """)
 
+        # Trades table (manual trade entries)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date DATE NOT NULL,
+                time TIME,
+                ticker TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                price REAL NOT NULL,
+                cost REAL,
+                strategy TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Create indexes for common queries
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_holdings_filing ON holdings(filing_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_filings_fund ON filings(fund_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_filings_date ON filings(report_date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_prices_ticker_date ON prices(ticker, date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_ticker ON trades(ticker)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date)")
 
     print(f"Database initialized at {DATABASE_PATH}")
 
@@ -223,6 +241,33 @@ def get_price_history(ticker: str, start_date: str = None, end_date: str = None)
         query += " ORDER BY date"
         cursor.execute(query, params)
         return cursor.fetchall()
+
+
+def insert_trade(trade_data: dict) -> int:
+    """Insert a trade and return its ID."""
+    with get_cursor() as cursor:
+        cursor.execute("""
+            INSERT INTO trades
+            (date, time, ticker, direction, quantity, price, cost, strategy)
+            VALUES (:date, :time, :ticker, :direction, :quantity, :price, :cost, :strategy)
+        """, trade_data)
+        return cursor.lastrowid
+
+
+def get_all_trades():
+    """Get all trades ordered by date descending."""
+    with get_cursor() as cursor:
+        cursor.execute("""
+            SELECT * FROM trades
+            ORDER BY date DESC, time DESC
+        """)
+        return cursor.fetchall()
+
+
+def delete_trade(trade_id: int):
+    """Delete a trade by ID."""
+    with get_cursor() as cursor:
+        cursor.execute("DELETE FROM trades WHERE id = ?", (trade_id,))
 
 
 if __name__ == "__main__":

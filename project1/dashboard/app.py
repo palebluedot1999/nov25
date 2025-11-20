@@ -144,8 +144,11 @@ def show_overview():
 
 
 def show_positions():
-    """Positions page - shows all current holdings."""
+    """Positions page - shows all current holdings and trade entry."""
     from utils.data_processing import get_holdings_dataframe, load_funds_config
+    from utils.database import insert_trade, get_all_trades, delete_trade
+    import pandas as pd
+    from datetime import date, datetime
 
     st.title("Portfolio Positions")
 
@@ -154,36 +157,105 @@ def show_positions():
 
     df = get_holdings_dataframe(default_fund)
 
-    if df.empty:
-        st.warning("No position data available.")
-        return
+    if not df.empty:
+        # Filters
+        col1, col2 = st.columns(2)
+        with col1:
+            min_weight = st.slider("Minimum Weight (%)", 0.0, 10.0, 0.0, 0.1)
+        with col2:
+            search = st.text_input("Search Company")
 
-    # Filters
-    col1, col2 = st.columns(2)
-    with col1:
-        min_weight = st.slider("Minimum Weight (%)", 0.0, 10.0, 0.0, 0.1)
-    with col2:
-        search = st.text_input("Search Company")
+        # Apply filters
+        filtered_df = df[df['weight'] >= min_weight]
+        if search:
+            filtered_df = filtered_df[
+                filtered_df['company_name'].str.contains(search, case=False, na=False)
+            ]
 
-    # Apply filters
-    filtered_df = df[df['weight'] >= min_weight]
-    if search:
-        filtered_df = filtered_df[
-            filtered_df['company_name'].str.contains(search, case=False, na=False)
-        ]
+        # Display
+        display_cols = ['company_name', 'ticker', 'cusip', 'shares', 'value_millions', 'weight']
+        display_df = filtered_df[display_cols].copy()
+        display_df.columns = ['Company', 'Ticker', 'CUSIP', 'Shares', 'Value ($M)', 'Weight (%)']
 
-    # Display
-    display_cols = ['company_name', 'ticker', 'cusip', 'shares', 'value_millions', 'weight']
-    display_df = filtered_df[display_cols].copy()
-    display_df.columns = ['Company', 'Ticker', 'CUSIP', 'Shares', 'Value ($M)', 'Weight (%)']
+        st.dataframe(
+            display_df.sort_values('Value ($M)', ascending=False),
+            use_container_width=True,
+            hide_index=True
+        )
 
-    st.dataframe(
-        display_df.sort_values('Value ($M)', ascending=False),
-        use_container_width=True,
-        hide_index=True
-    )
+        st.info(f"Showing {len(filtered_df)} of {len(df)} positions")
+    else:
+        st.warning("No 13F position data available.")
 
-    st.info(f"Showing {len(filtered_df)} of {len(df)} positions")
+    st.divider()
+
+    # Trade Entry Section
+    st.subheader("Trade Entry")
+
+    with st.form("trade_form"):
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            trade_date = st.date_input("Date", value=date.today())
+            trade_time = st.time_input("Time", value=datetime.now().time())
+            ticker = st.text_input("Ticker", placeholder="e.g., AAPL")
+
+        with col2:
+            direction = st.selectbox("Direction", ["BUY", "SELL"])
+            quantity = st.number_input("Quantity", min_value=0.0, step=1.0)
+            price = st.number_input("Price", min_value=0.0, step=0.01)
+
+        with col3:
+            cost = st.number_input("Cost/Commission", min_value=0.0, step=0.01)
+            strategy = st.text_input("Strategy", placeholder="e.g., Momentum")
+
+        submitted = st.form_submit_button("Add Trade")
+
+        if submitted:
+            if ticker and quantity > 0 and price > 0:
+                trade_data = {
+                    'date': trade_date.isoformat(),
+                    'time': trade_time.strftime('%H:%M:%S'),
+                    'ticker': ticker.upper(),
+                    'direction': direction,
+                    'quantity': quantity,
+                    'price': price,
+                    'cost': cost,
+                    'strategy': strategy
+                }
+                insert_trade(trade_data)
+                st.success(f"Trade added: {direction} {quantity} {ticker.upper()} @ ${price}")
+                st.rerun()
+            else:
+                st.error("Please fill in ticker, quantity, and price.")
+
+    # Display trades table
+    st.subheader("Trade History")
+
+    trades = get_all_trades()
+
+    if trades:
+        trades_df = pd.DataFrame([dict(t) for t in trades])
+        display_trades = trades_df[['id', 'date', 'time', 'ticker', 'direction', 'quantity', 'price', 'cost', 'strategy']].copy()
+        display_trades.columns = ['ID', 'Date', 'Time', 'Ticker', 'Direction', 'Qty', 'Price', 'Cost', 'Strategy']
+
+        st.dataframe(
+            display_trades,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Delete trade option
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            trade_to_delete = st.number_input("Trade ID to delete", min_value=1, step=1)
+        with col2:
+            if st.button("Delete Trade"):
+                delete_trade(trade_to_delete)
+                st.success(f"Trade {trade_to_delete} deleted")
+                st.rerun()
+    else:
+        st.info("No trades recorded yet.")
 
 
 def show_pnl():

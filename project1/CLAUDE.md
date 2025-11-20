@@ -7,6 +7,22 @@ Hedge fund portfolio tracker that scrapes SEC 13F filings and displays analysis 
 - **Phase 1 Complete**: Foundation built
 - **Target Fund**: Baker Bros. Advisors LP (CIK 1263508)
 - **Benchmark**: XBI (SPDR S&P Biotech ETF)
+- **Python**: 3.12.10 (installed via `py install 3.12`)
+
+## Setup Instructions
+```bash
+# Activate virtual environment
+source .venv/Scripts/activate
+
+# Initialize database (creates tables)
+python -c "from utils.database import init_database; init_database()"
+
+# Run dashboard
+streamlit run dashboard/app.py
+```
+
+## Known Issues (To Debug)
+- **Positions page KeyError**: `get_holdings_dataframe()` in `utils/data_processing.py` has edge case when database returns empty holdings but with a filing record. Need to trace the exact data flow.
 
 ## Tech Stack
 - **Backend**: Python
@@ -30,8 +46,9 @@ Hedge fund portfolio tracker that scrapes SEC 13F filings and displays analysis 
 ## What's Working
 - SEC EDGAR scraper for 13F filings
 - Yahoo Finance price fetcher
-- Database schema with all tables
+- Database schema with all tables (funds, filings, holdings, prices, benchmarks, trades)
 - Dashboard with Overview, Positions, Calendar, Data Management pages
+- **Trade entry form** on Positions page (date, time, ticker, direction, quantity, price, cost, strategy)
 - P&L and tracking error analysis modules (need price data to function)
 
 ## Next Steps / Future Enhancements
