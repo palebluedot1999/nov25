@@ -1,13 +1,16 @@
 """
 SEC EDGAR scraper for 13F filings.
+Updated to work with new database schema (portfolios, securities, holdings).
 """
 
 import requests
 import xml.etree.ElementTree as ET
 import json
 import time
+import re
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, List, Dict
 
 from config.settings import (
     SEC_EDGAR_API_URL,
@@ -15,6 +18,14 @@ from config.settings import (
     SEC_USER_AGENT,
     RAW_DATA_DIR
 )
+from utils.database import (
+    insert_portfolio,
+    insert_security,
+    insert_filing,
+    insert_holding,
+    get_security_by_cusip
+)
+from utils.cusip_mapping import cusip_to_ticker
 
 
 class SECEdgarScraper:
@@ -122,8 +133,14 @@ class SECEdgarScraper:
         holdings = []
 
         try:
-            # Remove namespace prefixes for easier parsing
-            xml_content = xml_content.replace('ns1:', '').replace('xmlns:', 'xmlns_')
+            # Remove namespace prefixes and declarations for easier parsing
+            # Remove all namespace declarations (xmlns:prefix="..." and xmlns="...")
+            xml_content = re.sub(r' xmlns[:\w]*="[^"]*"', '', xml_content)
+            # Remove namespace prefixes from attributes (e.g., xsi:schemaLocation -> schemaLocation)
+            xml_content = re.sub(r'(\s)([a-zA-Z0-9]+):([a-zA-Z0-9]+)=', r'\1\3=', xml_content)
+            # Remove namespace prefixes from tags (e.g., ns1:tag -> tag)
+            xml_content = re.sub(r'<([a-zA-Z0-9]+):([a-zA-Z0-9]+)', r'<\2', xml_content)
+            xml_content = re.sub(r'</([a-zA-Z0-9]+):([a-zA-Z0-9]+)', r'</\2', xml_content)
 
             root = ET.fromstring(xml_content)
 
@@ -188,19 +205,112 @@ class SECEdgarScraper:
             print(f"Error parsing holding entry: {e}")
             return None
 
-    def fetch_and_save_filings(self, cik: str, fund_id: str, limit: int = None):
-        """Fetch filings and save to raw data directory."""
+    def process_and_store_filing(self, portfolio_id: str, filing_info: dict, holdings: list):
+        """
+        Process a filing and store it in the database.
+        Creates/updates securities, filing record, and holdings.
+
+        Args:
+            portfolio_id: ID of the portfolio this filing belongs to
+            filing_info: Filing metadata dict
+            holdings: List of holding dicts from the filing
+        """
+        print(f"Processing filing {filing_info['accession_number']}...")
+
+        # 1. Insert filing record
+        filing_data = {
+            'portfolio_id': portfolio_id,
+            'accession_number': filing_info['accession_number'],
+            'filing_date': filing_info['filing_date'],
+            'report_date': filing_info['report_date'],
+            'form_type': filing_info['form_type'],
+            'total_value': sum(h.get('value', 0) for h in holdings),
+            'num_positions': len(holdings),
+            'source': 'SEC EDGAR'
+        }
+
+        filing_id = insert_filing(filing_data)
+        if not filing_id:
+            print(f"  Filing already exists or error inserting: {filing_info['accession_number']}")
+            return
+
+        print(f"  Inserted filing (ID: {filing_id})")
+
+        # 2. Process each holding
+        securities_created = 0
+        holdings_created = 0
+
+        for holding in holdings:
+            cusip = holding.get('cusip')
+            if not cusip:
+                print(f"  Warning: Skipping holding without CUSIP: {holding.get('company_name')}")
+                continue
+
+            # Check if security exists
+            security = get_security_by_cusip(cusip)
+
+            if not security:
+                # Try to resolve ticker via CUSIP mapper
+                ticker = cusip_to_ticker(cusip, holding.get('company_name'))
+
+                # Create security record
+                security_data = {
+                    'cusip': cusip,
+                    'ticker': ticker,
+                    'company_name': holding.get('company_name', ''),
+                    'share_class': holding.get('share_class'),
+                    'asset_class': 'stock',  # Default for 13F holdings
+                    'sector': None,
+                    'industry': None,
+                    'exchange': None,
+                    'is_active': 1
+                }
+
+                security_id = insert_security(security_data)
+                securities_created += 1
+            else:
+                security_id = security['id']
+
+            # Insert holding record
+            holding_data = {
+                'portfolio_id': portfolio_id,
+                'security_id': security_id,
+                'as_of_date': filing_info['report_date'],
+                'shares': holding.get('shares', 0),
+                'cost_basis': None,  # 13F doesn't provide cost basis
+                'market_value': holding.get('value', 0),
+                'filing_id': filing_id,
+                'source': '13F'
+            }
+
+            insert_holding(holding_data)
+            holdings_created += 1
+
+        print(f"  Created {securities_created} new securities")
+        print(f"  Created {holdings_created} holdings")
+
+    def fetch_and_save_filings(self, cik: str, portfolio_id: str, limit: int = None,
+                               save_to_db: bool = True):
+        """
+        Fetch filings and save to raw data directory and optionally to database.
+
+        Args:
+            cik: Company CIK number
+            portfolio_id: Portfolio ID for database storage
+            limit: Optional limit on number of filings to fetch
+            save_to_db: Whether to store in database (default True)
+        """
         filings = self.get_13f_filings(cik, limit)
 
         RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
         for filing in filings:
-            print(f"Fetching {filing['form_type']} from {filing['filing_date']}...")
+            print(f"\nFetching {filing['form_type']} from {filing['filing_date']}...")
 
             holdings = self.get_13f_holdings(cik, filing['accession_number'])
 
-            # Save to JSON
-            output_file = RAW_DATA_DIR / f"{fund_id}_{filing['accession_number']}.json"
+            # Save to JSON (raw backup)
+            output_file = RAW_DATA_DIR / f"{portfolio_id}_{filing['accession_number']}.json"
             data = {
                 'filing': filing,
                 'holdings': holdings,
@@ -212,6 +322,13 @@ class SECEdgarScraper:
 
             print(f"  Saved {len(holdings)} holdings to {output_file.name}")
 
+            # Store in database
+            if save_to_db:
+                try:
+                    self.process_and_store_filing(portfolio_id, filing, holdings)
+                except Exception as e:
+                    print(f"  Error storing filing in database: {e}")
+
         return filings
 
 
@@ -220,7 +337,7 @@ def fetch_baker_bros_filings(limit: int = 5):
     scraper = SECEdgarScraper()
     return scraper.fetch_and_save_filings(
         cik='1263508',
-        fund_id='baker-bros',
+        portfolio_id='baker-bros',
         limit=limit
     )
 

@@ -1,14 +1,21 @@
 """
 Yahoo Finance data fetcher for stock prices and benchmarks.
+Updated to work with new database schema (securities, prices, benchmark_prices).
 """
 
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List, Dict
 
 from config.settings import DEFAULT_BENCHMARK
-from utils.database import insert_prices, get_price_history
+from utils.database import (
+    insert_prices,
+    insert_benchmark_prices,
+    get_price_history,
+    get_security_by_ticker,
+    insert_security
+)
 
 
 class YahooFinanceFetcher:
@@ -132,9 +139,39 @@ class YahooFinanceFetcher:
         if df.empty:
             return
 
-        prices = df.to_dict('records')
+        # Add security_id if available
+        prices = []
+        for record in df.to_dict('records'):
+            security = get_security_by_ticker(record['ticker'])
+            record['security_id'] = security['id'] if security else None
+            prices.append(record)
+
         insert_prices(prices)
         print(f"Saved {len(prices)} price records to database")
+
+    def save_benchmark_prices_to_db(self, df: pd.DataFrame, portfolio_id: str):
+        """
+        Save benchmark price data to database.
+
+        Args:
+            df: DataFrame with price data
+            portfolio_id: Portfolio ID (should be a benchmark portfolio)
+        """
+        if df.empty:
+            return
+
+        benchmark_prices = []
+        for record in df.to_dict('records'):
+            benchmark_prices.append({
+                'portfolio_id': portfolio_id,
+                'ticker': record['ticker'],
+                'date': record['date'],
+                'close': record['close'],
+                'adj_close': record['adj_close']
+            })
+
+        insert_benchmark_prices(benchmark_prices)
+        print(f"Saved {len(benchmark_prices)} benchmark price records to database")
 
     def get_stock_info(self, ticker: str) -> dict:
         """Get company info for a ticker."""
@@ -147,11 +184,68 @@ class YahooFinanceFetcher:
                 'sector': info.get('sector'),
                 'industry': info.get('industry'),
                 'market_cap': info.get('marketCap'),
-                'currency': info.get('currency', 'USD')
+                'currency': info.get('currency', 'USD'),
+                'exchange': info.get('exchange')
             }
         except Exception as e:
             print(f"Error getting info for {ticker}: {e}")
             return {'ticker': ticker}
+
+    def enrich_security(self, ticker: str) -> bool:
+        """
+        Enrich an existing security with Yahoo Finance data (sector, industry, etc.).
+
+        Args:
+            ticker: Stock ticker to enrich
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            security = get_security_by_ticker(ticker)
+            if not security:
+                print(f"Security {ticker} not found in database")
+                return False
+
+            # Fetch info from Yahoo Finance
+            info = self.get_stock_info(ticker)
+
+            # Update security with enriched data
+            security_data = {
+                'cusip': security['cusip'],
+                'ticker': ticker,
+                'company_name': info.get('name') or security['company_name'],
+                'share_class': security['share_class'],
+                'asset_class': security['asset_class'] or 'stock',
+                'sector': info.get('sector'),
+                'industry': info.get('industry'),
+                'exchange': info.get('exchange'),
+                'is_active': security['is_active']
+            }
+
+            insert_security(security_data)
+            print(f"Enriched security {ticker} with Yahoo Finance data")
+            return True
+
+        except Exception as e:
+            print(f"Error enriching security {ticker}: {e}")
+            return False
+
+    def bulk_enrich_securities(self, tickers: List[str]):
+        """
+        Enrich multiple securities with Yahoo Finance data.
+
+        Args:
+            tickers: List of tickers to enrich
+        """
+        print(f"Enriching {len(tickers)} securities with Yahoo Finance data...")
+        success_count = 0
+
+        for ticker in tickers:
+            if self.enrich_security(ticker):
+                success_count += 1
+
+        print(f"Successfully enriched {success_count}/{len(tickers)} securities")
 
 
 def fetch_prices_for_holdings(tickers: list, period: str = "1y"):
