@@ -3,6 +3,7 @@ Application settings and configuration.
 """
 
 from pathlib import Path
+import os
 
 # Project paths
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -18,6 +19,11 @@ SEC_USER_AGENT = "Portfolio Tracker (thomaspwiig@gmail.com)"  # SEC requires use
 
 # Yahoo Finance settings
 YAHOO_FINANCE_ENABLED = True
+
+# OpenFIGI API settings (for CUSIP-to-ticker mapping)
+# Tries environment variable first, falls back to hardcoded value
+# Sign up for free API key at: https://www.openfigi.com/api
+OPENFIGI_API_KEY = os.getenv('OPENFIGI_API_KEY', None)  # Set to None or your key here
 
 # Data refresh settings
 CACHE_EXPIRY_HOURS = 24  # How long to cache data before refreshing

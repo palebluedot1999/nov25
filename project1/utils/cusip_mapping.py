@@ -8,7 +8,7 @@ import json
 import time
 from typing import Optional, Dict
 from pathlib import Path
-from config.settings import DATA_DIR, SEC_USER_AGENT as USER_AGENT
+from config.settings import DATA_DIR, SEC_USER_AGENT as USER_AGENT, OPENFIGI_API_KEY
 
 # Cache file for CUSIP mappings
 CACHE_FILE = DATA_DIR / "cusip_cache.json"
@@ -88,8 +88,13 @@ class CUSIPMapper:
             url = "https://api.openfigi.com/v3/mapping"
             headers = {
                 'Content-Type': 'application/json',
-                # Add 'X-OPENFIGI-APIKEY': 'your-api-key' for production
             }
+
+            # Add API key if configured
+            if OPENFIGI_API_KEY:
+                headers['X-OPENFIGI-APIKEY'] = OPENFIGI_API_KEY
+            else:
+                print(f"Warning: No OpenFIGI API key configured. Using unauthenticated requests (limited rate).")
 
             payload = [{
                 "idType": "ID_CUSIP",
