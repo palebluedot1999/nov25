@@ -77,26 +77,32 @@ def initialize_portfolios():
 
 def process_raw_filings(portfolio_id: str):
     """
-    Process raw filing JSON files into database.
+    Process raw filing CSV files into database.
     Handles conversion to new schema with securities and holdings.
 
     Args:
         portfolio_id: Portfolio ID to process filings for
     """
-    raw_files = list(RAW_DATA_DIR.glob(f"{portfolio_id}_*.json"))
+    raw_files = list(RAW_DATA_DIR.glob(f"{portfolio_id}_*_filing.csv"))
 
     if not raw_files:
-        print(f"No raw files found for {portfolio_id}")
+        print(f"No raw filing files found for {portfolio_id}")
         return
 
     for file_path in raw_files:
         print(f"Processing {file_path.name}...")
 
-        with open(file_path) as f:
-            data = json.load(f)
+        # Read filing metadata
+        filing_df = pd.read_csv(file_path)
+        filing_info = filing_df.iloc[0].to_dict()
 
-        filing_info = data.get('filing', {})
-        holdings_data = data.get('holdings', [])
+        # Read holdings (if holdings file exists)
+        holdings_file = file_path.parent / file_path.name.replace('_filing.csv', '_holdings.csv')
+        if holdings_file.exists():
+            holdings_df = pd.read_csv(holdings_file)
+            holdings_data = holdings_df.to_dict('records')
+        else:
+            holdings_data = []
 
         # Calculate totals
         total_value = sum(h.get('value', 0) for h in holdings_data)

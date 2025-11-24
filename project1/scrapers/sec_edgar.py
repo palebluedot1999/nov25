@@ -5,7 +5,7 @@ Updated to work with new database schema (portfolios, securities, holdings).
 
 import requests
 import xml.etree.ElementTree as ET
-import json
+import pandas as pd
 import time
 import re
 from datetime import datetime
@@ -309,18 +309,25 @@ class SECEdgarScraper:
 
             holdings = self.get_13f_holdings(cik, filing['accession_number'])
 
-            # Save to JSON (raw backup)
-            output_file = RAW_DATA_DIR / f"{portfolio_id}_{filing['accession_number']}.json"
-            data = {
-                'filing': filing,
-                'holdings': holdings,
+            # Save to CSV (raw backup)
+            base_filename = f"{portfolio_id}_{filing['accession_number']}"
+
+            # Save filing metadata CSV
+            filing_csv = RAW_DATA_DIR / f"{base_filename}_filing.csv"
+            filing_df = pd.DataFrame([{
+                **filing,
                 'fetched_at': datetime.now().isoformat()
-            }
+            }])
+            filing_df.to_csv(filing_csv, index=False)
 
-            with open(output_file, 'w') as f:
-                json.dump(data, f, indent=2)
-
-            print(f"  Saved {len(holdings)} holdings to {output_file.name}")
+            # Save holdings CSV (if any holdings exist)
+            if holdings:
+                holdings_csv = RAW_DATA_DIR / f"{base_filename}_holdings.csv"
+                holdings_df = pd.DataFrame(holdings)
+                holdings_df.to_csv(holdings_csv, index=False)
+                print(f"  Saved {len(holdings)} holdings to {filing_csv.name} and {holdings_csv.name}")
+            else:
+                print(f"  Saved filing metadata to {filing_csv.name} (no holdings)")
 
             # Store in database
             if save_to_db:

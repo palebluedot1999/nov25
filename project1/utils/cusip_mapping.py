@@ -11,7 +11,7 @@ from pathlib import Path
 from config.settings import DATA_DIR, SEC_USER_AGENT as USER_AGENT, OPENFIGI_API_KEY
 
 # Cache file for CUSIP mappings
-CACHE_FILE = DATA_DIR / "cusip_cache.json"
+CACHE_FILE = DATA_DIR / "cusip_cache.csv"
 
 
 class CUSIPMapper:
@@ -28,22 +28,32 @@ class CUSIPMapper:
         self.sec_tickers_data = None
 
     def _load_cache(self) -> Dict[str, str]:
-        """Load cached CUSIP to ticker mappings."""
+        """Load cached CUSIP to ticker mappings from CSV."""
         if CACHE_FILE.exists():
             try:
+                cache = {}
                 with open(CACHE_FILE, 'r') as f:
-                    return json.load(f)
+                    # Skip header
+                    next(f, None)
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            cusip, ticker = line.split(',')
+                            cache[cusip] = ticker
+                return cache
             except Exception as e:
                 print(f"Warning: Could not load CUSIP cache: {e}")
                 return {}
         return {}
 
     def _save_cache(self):
-        """Save cache to disk."""
+        """Save cache to disk as CSV."""
         try:
             CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(CACHE_FILE, 'w') as f:
-                json.dump(self.cache, f, indent=2)
+                f.write("cusip,ticker\n")
+                for cusip, ticker in sorted(self.cache.items()):
+                    f.write(f"{cusip},{ticker}\n")
         except Exception as e:
             print(f"Warning: Could not save CUSIP cache: {e}")
 
