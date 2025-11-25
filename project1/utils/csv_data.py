@@ -10,7 +10,8 @@ from datetime import datetime
 
 # Paths
 DATA_DIR = Path(__file__).parent.parent / "data"
-HOLDINGS_DIR = DATA_DIR / "holdings"
+RAW_DATA_DIR = DATA_DIR / "raw"
+HOLDINGS_DIR = RAW_DATA_DIR / "13f_filings"
 PRICES_DIR = DATA_DIR / "prices"
 PORTFOLIOS_FILE = DATA_DIR / "portfolios.csv"
 STRATEGIES_FILE = DATA_DIR / "strategies.csv"

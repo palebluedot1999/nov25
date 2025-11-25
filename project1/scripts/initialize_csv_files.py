@@ -14,6 +14,7 @@ from pathlib import Path
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
 FUNDS_CONFIG = PROJECT_ROOT / "config" / "funds.json"  # NOTE: This file no longer exists after migration
 
 # CSV files to create
@@ -117,7 +118,7 @@ def create_directories():
 
     directories = [
         DATA_DIR,
-        DATA_DIR / "holdings",
+        RAW_DATA_DIR / "13f_filings",
         DATA_DIR / "prices",
     ]
 

@@ -41,7 +41,7 @@ def backfill_baker_bros():
     print(f"Backfill Complete!")
     print("=" * 60)
     print(f"Fetched {len(filings)} filings")
-    print(f"Holdings saved to: data/holdings/")
+    print(f"Holdings saved to: data/raw/13f_filings/")
     print()
     print("Next step: Start the dashboard")
     print("  streamlit run dashboard/app.py")

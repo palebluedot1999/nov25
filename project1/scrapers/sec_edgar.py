@@ -16,7 +16,7 @@ from config.settings import (
     SEC_EDGAR_API_URL,
     SEC_EDGAR_BASE_URL,
     SEC_USER_AGENT,
-    DATA_DIR
+    RAW_DATA_DIR
 )
 from utils.cusip_mapping import cusip_to_ticker
 
@@ -226,8 +226,8 @@ class SECEdgarScraper:
         if not save_to_csv:
             return all_filings
 
-        # Create holdings directory
-        holdings_dir = DATA_DIR / "holdings"
+        # Create 13F filings directory
+        holdings_dir = RAW_DATA_DIR / "13f_filings"
         holdings_dir.mkdir(parents=True, exist_ok=True)
 
         # Process each filing

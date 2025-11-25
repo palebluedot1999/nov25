@@ -96,7 +96,7 @@ if st.button("Fetch 13F Filings"):
             portfolio_id=selected_portfolio['id'],
             limit=num_filings
         )
-        st.success(f"Fetched {len(filings)} filings and saved to data/holdings/")
+        st.success(f"Fetched {len(filings)} filings and saved to data/raw/13f_filings/")
         st.info("Holdings CSVs saved with filing_date and period_end_date columns")
 
 st.divider()
