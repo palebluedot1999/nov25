@@ -6,12 +6,9 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional
 
-from utils.database import (
-    get_holdings_for_filing,
-    get_latest_filing,
-    get_all_filings,
-    get_price_history
-)
+# NOTE: This module needs updating to use CSV storage (utils.csv_data)
+# Database imports removed - module not currently used by dashboard
+# TODO: Update to use load_latest_holdings, get_all_filings, load_prices from utils.csv_data
 from scrapers.yahoo_finance import YahooFinanceFetcher
 
 

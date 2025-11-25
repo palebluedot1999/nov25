@@ -9,13 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
 from config.settings import DEFAULT_BENCHMARK
-from utils.database import (
-    insert_prices,
-    insert_benchmark_prices,
-    get_price_history,
-    get_security_by_ticker,
-    insert_security
-)
+# Database functions removed - now using CSV storage via utils.csv_data
 
 
 class YahooFinanceFetcher:

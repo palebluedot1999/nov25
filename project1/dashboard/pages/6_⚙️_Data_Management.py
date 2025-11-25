@@ -12,7 +12,6 @@ sys.path.insert(0, str(project_root))
 
 from scrapers.sec_edgar import SECEdgarScraper
 from scrapers.yahoo_finance import YahooFinanceFetcher
-from utils.data_processing import load_funds_config
 from utils.csv_data import load_portfolios, PORTFOLIOS_FILE, STRATEGIES_FILE
 import pandas as pd
 

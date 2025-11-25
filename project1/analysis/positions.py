@@ -5,11 +5,9 @@ Position analysis for portfolio holdings.
 import pandas as pd
 from typing import Optional
 
-from utils.database import (
-    get_holdings_for_filing,
-    get_latest_filing,
-    get_all_filings
-)
+# NOTE: This module needs updating to use CSV storage (utils.csv_data)
+# Database imports removed - module not currently used by dashboard
+# TODO: Update to use load_latest_holdings, get_all_filings, load_holdings_by_date from utils.csv_data
 
 
 class PositionAnalyzer:

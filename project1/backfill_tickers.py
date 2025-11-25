@@ -1,9 +1,12 @@
 """
-Backfill missing tickers for securities in the database.
-Run this script hourly to gradually populate all tickers within rate limits.
+NOTE: This script is obsolete after CSV migration.
+Tickers are now populated directly by SEC scraper during holdings fetch.
+Database no longer exists - holdings stored in CSV files with tickers included.
+
+Original purpose: Backfill missing tickers for securities in the database.
 """
 
-from utils.database import get_connection
+# from utils.database import get_connection  # Removed - database deleted
 from utils.cusip_mapping import get_mapper
 import time
 

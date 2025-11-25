@@ -19,13 +19,7 @@ from utils.csv_data import (
 )
 
 
-def load_funds_config():
-    """Load fund configuration from JSON."""
-    config_path = Path(__file__).parent.parent / "config" / "funds.json"
-    with open(config_path) as f:
-        return json.load(f)
-
-
+# NOTE: load_funds_config() removed - funds.json migrated to data/portfolios.csv
 # NOTE: initialize_portfolios() and process_raw_filings() have been removed
 # Portfolio initialization is now done via scripts/initialize_csv_files.py
 # Holdings are fetched directly to CSV format by SEC scraper (no processing needed)

@@ -1,6 +1,10 @@
 """
 Initialize CSV data files from config.
 Run this once to set up the CSV-based data structure.
+
+NOTE: This is a one-time migration script.
+Original config/funds.json has been deleted after successful migration to data/portfolios.csv.
+To add new portfolios, edit data/portfolios.csv directly or use the dashboard.
 """
 
 import json
@@ -10,7 +14,7 @@ from pathlib import Path
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
-FUNDS_CONFIG = PROJECT_ROOT / "config" / "funds.json"
+FUNDS_CONFIG = PROJECT_ROOT / "config" / "funds.json"  # NOTE: This file no longer exists after migration
 
 # CSV files to create
 PORTFOLIOS_FILE = DATA_DIR / "portfolios.csv"

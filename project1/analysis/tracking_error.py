@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from config.settings import DEFAULT_BENCHMARK
-from utils.database import get_price_history, get_all_filings
+# NOTE: This module needs updating to use CSV storage (utils.csv_data)
+# Database imports removed - module not currently used by dashboard
+# TODO: Update to use load_prices, get_all_filings from utils.csv_data
 from scrapers.yahoo_finance import YahooFinanceFetcher
 
 

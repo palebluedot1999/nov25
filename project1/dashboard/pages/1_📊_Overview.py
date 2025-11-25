@@ -10,7 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from utils.data_processing import get_portfolio_summary, load_funds_config
+from utils.data_processing import get_portfolio_summary
 from utils.csv_data import load_portfolios
 
 st.title("Portfolio Overview")
