@@ -11,14 +11,14 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from utils.data_processing import get_portfolio_summary, load_funds_config
-from utils.database import get_all_portfolios
+from utils.csv_data import load_portfolios
 
 st.title("Portfolio Overview")
 
 # Portfolio selector
-portfolios = get_all_portfolios(portfolio_type='fund')
+portfolios = load_portfolios(portfolio_type='fund').to_dict('records')
 if not portfolios:
-    st.warning("No portfolios found. Please initialize database from Data Management page.")
+    st.warning("No portfolios found. Please initialize data files from Data Management page.")
     st.stop()
 
 portfolio_options = {p['name']: p['id'] for p in portfolios}
@@ -68,8 +68,6 @@ if summary['top_holdings']:
     import pandas as pd
 
     df = pd.DataFrame(summary['top_holdings'])
-    df['value_millions'] = (df['market_value'] / 1_000_000).round(2)
-    df['weight'] = (df['market_value'] / summary['total_value'] * 100).round(2)
 
     display_df = df[['company_name', 'ticker', 'shares', 'value_millions', 'weight']].copy()
     display_df.columns = ['Company', 'Ticker', 'Shares', 'Value ($M)', 'Weight (%)']
@@ -85,7 +83,7 @@ if summary['top_holdings']:
 
     fig = px.pie(
         df,
-        values='market_value',
+        values='value',
         names='company_name',
         title='Portfolio Composition (Top 10)'
     )
