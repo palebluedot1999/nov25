@@ -11,13 +11,11 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from utils.data_processing import get_holdings_dataframe
-from utils.database import (
-    get_all_portfolios,
-    insert_transaction,
-    get_transactions,
+from utils.csv_data import (
+    load_portfolios,
+    add_transaction,
+    load_transactions,
     delete_transaction,
-    get_security_by_ticker,
-    insert_security,
     get_all_strategies
 )
 import pandas as pd
@@ -26,7 +24,7 @@ from datetime import date, datetime
 st.title("Portfolio Positions")
 
 # Portfolio selector
-portfolios = get_all_portfolios()
+portfolios = load_portfolios().to_dict('records')
 if not portfolios:
     st.warning("No portfolios found.")
     st.stop()
@@ -123,32 +121,6 @@ with st.form("trade_form"):
 
     if submitted:
         if ticker and quantity > 0 and price > 0:
-            # Get or create security
-            security = get_security_by_ticker(ticker.upper())
-            if not security:
-                # Create basic security entry
-                security_id = insert_security({
-                    'cusip': None,
-                    'ticker': ticker.upper(),
-                    'company_name': ticker.upper(),
-                    'share_class': None,
-                    'asset_class': 'stock',
-                    'sector': None,
-                    'industry': None,
-                    'exchange': None,
-                    'is_active': 1
-                })
-            else:
-                security_id = security['id']
-
-            # Get strategy ID if selected
-            strategy_id = None
-            if strategy_name:
-                for s in strategies:
-                    if s['name'] == strategy_name:
-                        strategy_id = s['id']
-                        break
-
             # Calculate total value
             total_value = quantity * price
             if direction == "SELL":
@@ -156,7 +128,8 @@ with st.form("trade_form"):
 
             transaction_data = {
                 'portfolio_id': portfolio_id,
-                'security_id': security_id,
+                'ticker': ticker.upper(),
+                'cusip': '',
                 'transaction_date': trade_date.isoformat(),
                 'transaction_time': trade_time.strftime('%H:%M:%S'),
                 'transaction_type': direction,
@@ -164,12 +137,12 @@ with st.form("trade_form"):
                 'price': price,
                 'fees': cost,
                 'total_value': total_value,
-                'strategy_id': strategy_id,
+                'strategy': strategy_name if strategy_name else '',
                 'source': 'MANUAL',
-                'filing_id': None,
+                'filing_date': '',
                 'notes': notes
             }
-            insert_transaction(transaction_data)
+            add_transaction(transaction_data)
             st.success(f"Transaction added: {direction} {quantity} {ticker.upper()} @ ${price}")
             st.rerun()
         else:
@@ -178,12 +151,11 @@ with st.form("trade_form"):
 # Display transactions table
 st.subheader("Transaction History")
 
-transactions = get_transactions(portfolio_id)
+trans_df = load_transactions(portfolio_id)
 
-if transactions:
-    trans_df = pd.DataFrame([dict(t) for t in transactions])
+if not trans_df.empty:
     display_cols = ['id', 'transaction_date', 'transaction_time', 'ticker', 'transaction_type',
-                   'quantity', 'price', 'fees', 'strategy_name', 'source']
+                   'quantity', 'price', 'fees', 'strategy', 'source']
     available_cols = [col for col in display_cols if col in trans_df.columns]
     display_trans = trans_df[available_cols].copy()
 
@@ -196,7 +168,7 @@ if transactions:
         'quantity': 'Qty',
         'price': 'Price',
         'fees': 'Fees',
-        'strategy_name': 'Strategy',
+        'strategy': 'Strategy',
         'source': 'Source'
     }
     display_trans.columns = [col_names.get(col, col) for col in available_cols]
@@ -213,7 +185,7 @@ if transactions:
         trans_to_delete = st.number_input("Transaction ID to delete", min_value=1, step=1)
     with col2:
         if st.button("Delete Transaction"):
-            delete_transaction(trans_to_delete)
+            delete_transaction(int(trans_to_delete))
             st.success(f"Transaction {trans_to_delete} deleted")
             st.rerun()
 else:

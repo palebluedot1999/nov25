@@ -12,66 +12,70 @@ sys.path.insert(0, str(project_root))
 
 from scrapers.sec_edgar import SECEdgarScraper
 from scrapers.yahoo_finance import YahooFinanceFetcher
-from utils.data_processing import initialize_portfolios, process_raw_filings, load_funds_config
-from utils.database import (
-    init_database,
-    get_all_portfolios,
-    insert_portfolio,
-    insert_strategy
-)
+from utils.data_processing import load_funds_config
+from utils.csv_data import load_portfolios, PORTFOLIOS_FILE, STRATEGIES_FILE
+import pandas as pd
 
 st.title("Data Management")
 
-# Initialize database
-st.subheader("Database Setup")
+# CSV initialization
+st.subheader("Data Files Setup")
 
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("Initialize Database"):
-        init_database()
-        initialize_portfolios()
-        st.success("Database initialized!")
+    if st.button("Initialize Data Files"):
+        with st.spinner("Initializing CSV files..."):
+            import subprocess
+            result = subprocess.run(
+                ["python", "scripts/initialize_csv_files.py"],
+                cwd=project_root,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                st.success("Data files initialized!")
+                st.code(result.stdout)
+            else:
+                st.error("Initialization failed")
+                st.code(result.stderr)
 
 with col2:
-    if st.button("Initialize Default Strategies"):
-        # Add some default strategies
-        default_strategies = [
-            {'code': 'LONG_EQUITY', 'name': 'Long Equity', 'description': 'Long equity position', 'category': 'Directional', 'is_active': 1},
-            {'code': 'SHORT', 'name': 'Short', 'description': 'Short position', 'category': 'Directional', 'is_active': 1},
-            {'code': 'MOMENTUM', 'name': 'Momentum', 'description': 'Momentum strategy', 'category': 'Factor', 'is_active': 1},
-            {'code': 'VALUE', 'name': 'Value', 'description': 'Value investing', 'category': 'Factor', 'is_active': 1},
-            {'code': 'EVENT_DRIVEN', 'name': 'Event Driven', 'description': 'Event driven strategy', 'category': 'Special Situations', 'is_active': 1},
-        ]
-        for strategy in default_strategies:
-            insert_strategy(strategy)
-        st.success("Default strategies created!")
-
-with col3:
     with st.expander("Create User Portfolio"):
         portfolio_id = st.text_input("Portfolio ID", placeholder="my-portfolio")
         portfolio_name = st.text_input("Portfolio Name", placeholder="My Portfolio")
         if st.button("Create"):
             if portfolio_id and portfolio_name:
-                insert_portfolio({
+                # Load existing portfolios
+                if PORTFOLIOS_FILE.exists():
+                    df = pd.read_csv(PORTFOLIOS_FILE)
+                else:
+                    df = pd.DataFrame()
+
+                # Add new portfolio
+                new_portfolio = pd.DataFrame([{
                     'id': portfolio_id,
                     'name': portfolio_name,
                     'portfolio_type': 'user',
-                    'cik': None,
+                    'cik': '',
                     'description': 'User portfolio',
-                    'benchmark_id': None,
+                    'benchmark': '',
                     'is_active': 1
-                })
+                }])
+
+                df = pd.concat([df, new_portfolio], ignore_index=True)
+                df.to_csv(PORTFOLIOS_FILE, index=False)
                 st.success(f"Created portfolio: {portfolio_name}")
+                st.rerun()
             else:
                 st.error("Please provide both ID and name")
 
 st.divider()
 
 # Portfolio selection
-portfolios = get_all_portfolios(portfolio_type='fund')
+portfolios = load_portfolios(portfolio_type='fund').to_dict('records')
 if not portfolios:
-    st.warning("No fund portfolios found. Please initialize database first.")
+    st.warning("No fund portfolios found. Please initialize data files first.")
     st.stop()
 
 portfolio_options = {p['name']: p for p in portfolios}
@@ -85,62 +89,33 @@ st.subheader("SEC EDGAR Data")
 
 num_filings = st.number_input("Number of filings to fetch", 1, 20, 5)
 
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button("Fetch 13F Filings"):
-        with st.spinner("Fetching filings from SEC EDGAR..."):
-            scraper = SECEdgarScraper()
-            filings = scraper.fetch_and_save_filings(
-                cik=selected_portfolio['cik'],
-                portfolio_id=selected_portfolio['id'],
-                limit=num_filings
-            )
-            st.success(f"Fetched {len(filings)} filings!")
-
-with col2:
-    if st.button("Process Raw Filings"):
-        with st.spinner("Processing raw filings..."):
-            process_raw_filings(selected_portfolio['id'])
-            st.success("Filings processed and saved to database!")
+if st.button("Fetch 13F Filings"):
+    with st.spinner("Fetching filings from SEC EDGAR..."):
+        scraper = SECEdgarScraper()
+        filings = scraper.fetch_and_save_filings(
+            cik=selected_portfolio['cik'],
+            portfolio_id=selected_portfolio['id'],
+            limit=num_filings
+        )
+        st.success(f"Fetched {len(filings)} filings and saved to data/holdings/")
+        st.info("Holdings CSVs saved with filing_date and period_end_date columns")
 
 st.divider()
 
 # Fetch price data
 st.subheader("Price Data")
 
-col1, col2 = st.columns(2)
+if st.button("Fetch Benchmark Prices"):
+    with st.spinner("Fetching benchmark data..."):
+        from utils.csv_data import save_prices
+        fetcher = YahooFinanceFetcher()
+        benchmark_ticker = selected_portfolio.get('benchmark', 'XBI')
 
-with col1:
-    if st.button("Fetch Benchmark Prices"):
-        with st.spinner("Fetching benchmark data..."):
-            fetcher = YahooFinanceFetcher()
-            benchmark_ticker = selected_portfolio.get('benchmark_id', 'XBI')
-
-            # Try to extract ticker from benchmark_id if it's a portfolio ID
-            if '-benchmark-' in str(benchmark_ticker):
-                benchmark_ticker = benchmark_ticker.split('-benchmark-')[-1].upper()
-
-            df = fetcher.get_benchmark_data(benchmark=benchmark_ticker, period="1y")
-            if not df.empty:
-                # Save as benchmark prices
-                fetcher.save_benchmark_prices_to_db(df, selected_portfolio['id'])
-                st.success(f"Fetched {len(df)} price records for {benchmark_ticker}!")
-            else:
-                st.error(f"No data found for {benchmark_ticker}")
-
-with col2:
-    if st.button("Enrich Securities"):
-        with st.spinner("Enriching securities with Yahoo Finance data..."):
-            from utils.database import get_holdings
-            fetcher = YahooFinanceFetcher()
-
-            # Get unique tickers from holdings
-            holdings = get_holdings(selected_portfolio['id'])
-            tickers = list(set([h['ticker'] for h in holdings if h.get('ticker')]))
-
-            if tickers:
-                fetcher.bulk_enrich_securities(tickers)
-                st.success(f"Enriched {len(tickers)} securities!")
-            else:
-                st.warning("No tickers found to enrich")
+        df = fetcher.get_stock_prices(ticker=benchmark_ticker, period="1y")
+        if not df.empty:
+            # Save to CSV
+            save_prices(benchmark_ticker, df)
+            st.success(f"Fetched {len(df)} price records for {benchmark_ticker}!")
+            st.info(f"Saved to data/prices/{benchmark_ticker}.csv")
+        else:
+            st.error(f"No data found for {benchmark_ticker}")
