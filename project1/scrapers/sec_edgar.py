@@ -182,7 +182,7 @@ class SECEdgarScraper:
                 'company_name': get_text(entry, 'nameOfIssuer'),
                 'share_class': get_text(entry, 'titleOfClass'),
                 'cusip': get_text(entry, 'cusip'),
-                'value': float(get_text(entry, 'value') or 0) * 1000,  # Value is in thousands
+                'value': float(get_text(entry, 'value') or 0),  # Value already in correct scale
                 'shares': float(get_nested_text(entry, 'shrsOrPrnAmt', 'sshPrnamt') or 0),
                 'option_type': get_nested_text(entry, 'shrsOrPrnAmt', 'sshPrnamtType'),
                 'investment_discretion': get_text(entry, 'investmentDiscretion'),
