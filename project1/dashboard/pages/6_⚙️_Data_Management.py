@@ -104,17 +104,60 @@ st.divider()
 # Fetch price data
 st.subheader("Price Data")
 
-if st.button("Fetch Benchmark Prices"):
-    with st.spinner("Fetching benchmark data..."):
-        from utils.csv_data import save_prices
-        fetcher = YahooFinanceFetcher()
-        benchmark_ticker = selected_portfolio.get('benchmark', 'XBI')
+col1, col2 = st.columns(2)
 
-        df = fetcher.get_stock_prices(ticker=benchmark_ticker, period="1y")
-        if not df.empty:
-            # Save to CSV
-            save_prices(benchmark_ticker, df)
-            st.success(f"Fetched {len(df)} price records for {benchmark_ticker}!")
-            st.info(f"Saved to data/prices/{benchmark_ticker}.csv")
+with col1:
+    if st.button("Fetch Benchmark Prices"):
+        with st.spinner("Fetching benchmark data..."):
+            from utils.csv_data import save_prices
+            fetcher = YahooFinanceFetcher()
+            benchmark_ticker = selected_portfolio.get('benchmark', 'XBI')
+
+            df = fetcher.get_stock_prices(ticker=benchmark_ticker, period="5y")
+            if not df.empty:
+                # Save to CSV
+                save_prices(benchmark_ticker, df)
+                st.success(f"Fetched {len(df)} price records for {benchmark_ticker}!")
+                st.info(f"Saved to data/raw/yahoo_prices/{benchmark_ticker}.csv (5 years of data)")
+            else:
+                st.error(f"No data found for {benchmark_ticker}")
+
+with col2:
+    if st.button("Fetch All Holdings Prices"):
+        with st.spinner("Fetching price data for all holdings..."):
+            import subprocess
+            result = subprocess.run(
+                ["python", "scripts/fetch_all_prices.py"],
+                cwd=project_root,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                st.success("Successfully fetched all holdings prices!")
+                st.code(result.stdout[-500:] if len(result.stdout) > 500 else result.stdout)
+            else:
+                st.error("Failed to fetch prices")
+                st.code(result.stderr)
+
+st.divider()
+
+# Consolidate prices into master table
+st.subheader("Price Data Consolidation")
+
+st.info("Consolidate all individual ticker price files into a single master prices.csv table")
+
+if st.button("Consolidate Prices to Master Table"):
+    with st.spinner("Consolidating price files..."):
+        import subprocess
+        result = subprocess.run(
+            ["python", "scripts/consolidate_prices.py"],
+            cwd=project_root,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            st.success("Successfully consolidated prices into master table!")
+            st.code(result.stdout)
         else:
-            st.error(f"No data found for {benchmark_ticker}")
+            st.error("Consolidation failed")
+            st.code(result.stderr)

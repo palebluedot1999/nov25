@@ -10,7 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from utils.data_processing import get_portfolio_summary
+from utils.data_processing import get_portfolio_summary, get_top_holdings_over_time
 from utils.csv_data import load_portfolios
 
 st.title("Portfolio Overview")
@@ -88,3 +88,43 @@ if summary['top_holdings']:
         title='Portfolio Composition (Top 10)'
     )
     st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Historical weight chart for top 10 holdings
+    st.subheader("Top 10 Holdings Weight Over Time")
+
+    historical_df = get_top_holdings_over_time(portfolio_id, top_n=10)
+
+    if not historical_df.empty:
+        # Create line chart
+        fig_line = px.line(
+            historical_df,
+            x='filing_date',
+            y='weight',
+            color='ticker',
+            labels={
+                'filing_date': 'Filing Date',
+                'weight': 'Portfolio Weight (%)',
+                'ticker': 'Ticker'
+            },
+            title='Top 10 Holdings Weight Over Time',
+            hover_data=['company_name']
+        )
+
+        # Update layout for better visibility
+        fig_line.update_layout(
+            hovermode='x unified',
+            legend=dict(
+                title='Ticker',
+                orientation='v',
+                yanchor='top',
+                y=1,
+                xanchor='left',
+                x=1.02
+            )
+        )
+
+        st.plotly_chart(fig_line, use_container_width=True)
+    else:
+        st.info("No historical data available for weight tracking.")

@@ -37,6 +37,8 @@ streamlit run dashboard/app.py
 - `scrapers/yahoo_finance.py` - Price data fetcher
 - `utils/csv_data.py` - CSV data layer (replaces database)
 - `utils/data_processing.py` - Data transformation utilities
+- `scripts/fetch_all_prices.py` - Bulk fetch 5yr prices for all holdings
+- `scripts/consolidate_prices.py` - Merge individual price files into master table
 - `data/portfolios.csv` - Portfolio definitions
 - `data/holdings/*.csv` - Historical quarterly holdings (one per filing)
 
@@ -47,13 +49,17 @@ data/
 ├── strategies.csv              # Strategy definitions
 ├── tags.csv                    # Custom tags
 ├── transactions.csv            # Manual trade entries
-├── holdings/                   # Historical holdings (one CSV per quarter)
-│   ├── baker-bros_2021-02-16_holdings.csv
-│   ├── baker-bros_2021-05-17_holdings.csv
-│   └── ... (20 quarterly files)
-└── prices/                     # Price data (one CSV per ticker)
-    ├── AAPL.csv
-    └── XBI.csv
+├── raw/                        # Raw data from external sources
+│   ├── 13f_filings/            # SEC 13F filings (one CSV per quarter)
+│   │   ├── baker-bros_2021-02-16_holdings.csv
+│   │   ├── baker-bros_2021-05-17_holdings.csv
+│   │   └── ... (20 quarterly files)
+│   └── yahoo_prices/           # Yahoo Finance price data (one CSV per ticker)
+│       ├── AAPL.csv
+│       ├── XBI.csv
+│       └── ... (160 ticker files)
+└── processed/                  # Processed/consolidated data
+    └── prices.csv              # Master price table (all tickers consolidated with source column)
 ```
 
 ## Design Decisions
@@ -66,8 +72,11 @@ data/
 ## What's Working
 - SEC EDGAR scraper for 13F filings (saves to CSV with dates)
 - Yahoo Finance price fetcher (saves to CSV)
+- **Bulk price fetcher** for all 160 holdings (5 years of data)
+- **Price consolidation** into master prices.csv table (185K+ records)
 - CSV data layer with all operations (portfolios, holdings, prices, transactions)
 - Dashboard with Overview, Positions, Calendar, Data Management pages
+- **Top 10 Holdings Weight Over Time** chart on Overview page
 - **Trade entry form** on Positions page (date, time, ticker, direction, quantity, price, cost, strategy)
 - Historical holdings view (20 quarters of Baker Bros data)
 
