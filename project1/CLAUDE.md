@@ -37,6 +37,9 @@ streamlit run dashboard/app.py
 - `scrapers/yahoo_finance.py` - Price data fetcher
 - `utils/csv_data.py` - CSV data layer (replaces database)
 - `utils/data_processing.py` - Data transformation utilities
+- `utils/price_operations.py` - Smart incremental price fetching logic
+- `utils/security_operations.py` - Security addition with OpenFIGI bi-directional lookup
+- `utils/fund_operations.py` - Batch CIK processing and portfolio creation
 - `scripts/fetch_all_prices.py` - Bulk fetch 5yr prices for all holdings
 - `scripts/consolidate_prices.py` - Merge individual price files into master table
 - `data/portfolios.csv` - Portfolio definitions
@@ -73,12 +76,18 @@ data/
 - SEC EDGAR scraper for 13F filings (saves to CSV with dates)
 - Yahoo Finance price fetcher (saves to CSV)
 - **Bulk price fetcher** for all 160 holdings (5 years of data)
+- **Smart incremental price updates** - Only fetches missing dates (checks raw files first, falls back to processed)
 - **Price consolidation** into master prices.csv table (185K+ records)
 - CSV data layer with all operations (portfolios, holdings, prices, transactions)
 - Dashboard with Overview, Positions, Calendar, Data Management pages
 - **Top 10 Holdings Weight Over Time** chart on Overview page
 - **Trade entry form** on Positions page (date, time, ticker, direction, quantity, price, cost, strategy)
 - Historical holdings view (20 quarters of Baker Bros data)
+- **Redesigned Data Management page** with 4 sections:
+  - Smart Price Pull: Incremental updates with progress tracking
+  - Add New Security: Bi-directional ticker↔CUSIP resolution via OpenFIGI API
+  - Add Fund Portfolio: Batch CIK processing with auto-name fetching from SEC
+  - Process Raw Data: Consolidate raw files into master tables
 
 ## Next Steps / Future Enhancements
 - [ ] Update P&L and tracking error analysis modules to use CSV storage
