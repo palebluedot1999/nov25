@@ -29,8 +29,8 @@ project1/
 │   ├── strategies.csv           # Strategy definitions
 │   ├── tags.csv                 # Custom tags for categorization
 │   ├── transactions.csv         # Manual trade entries
-│   ├── cusip_cache.csv          # CUSIP-to-ticker mappings (OpenFIGI)
 │   ├── raw/
+│   │   ├── cusip_cache.csv      # CUSIP-to-ticker mappings (OpenFIGI)
 │   │   ├── 13f_filings/         # Quarterly holdings CSVs (one per filing)
 │   │   └── sec_13f_filing_periods_*.csv  # Filing calendar data
 │   ├── prices/                  # Price data CSVs (one per ticker)
@@ -242,7 +242,7 @@ baker-bros,Baker Bros. Advisors LP,1263508,XBI,true
 - **13F Filings**: Reported quarterly, approximately 45 days after quarter end
 - **Position Values**: SEC reports values in thousands; scraper converts to actual dollars
 - **SEC Rate Limit**: 10 requests per second (enforced by User-Agent header)
-- **CUSIP Mapping**: Cached in `data/cusip_cache.csv` to minimize OpenFIGI API calls
+- **CUSIP Mapping**: Cached in `data/raw/cusip_cache.csv` to minimize OpenFIGI API calls
 - **Data Updates**: Dashboard fetches data on page load (no background scheduler)
 
 ## Development

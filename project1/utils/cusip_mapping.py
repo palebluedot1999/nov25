@@ -11,7 +11,7 @@ from pathlib import Path
 from config.settings import DATA_DIR, SEC_USER_AGENT as USER_AGENT, OPENFIGI_API_KEY
 
 # Cache file for CUSIP mappings
-CACHE_FILE = DATA_DIR / "cusip_cache.csv"
+CACHE_FILE = DATA_DIR / "raw" / "cusip_cache.csv"
 
 
 class CUSIPMapper:

@@ -14,7 +14,6 @@ load_dotenv(PROJECT_ROOT / '.env')
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
-DATABASE_PATH = DATA_DIR / "portfolio.db"
 
 # SEC EDGAR settings
 SEC_EDGAR_BASE_URL = "https://www.sec.gov"
