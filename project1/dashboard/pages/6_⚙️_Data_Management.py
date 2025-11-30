@@ -33,6 +33,10 @@ from utils.fund_operations import (
     parse_cik_input,
     batch_add_funds
 )
+from utils.metadata_operations import (
+    get_metadata_fetch_status,
+    save_metadata_fetch_status
+)
 
 st.title("Data Management")
 
@@ -245,17 +249,17 @@ if st.button("Add to Cache", disabled=(not ticker_input and not cusip_input), ke
         st.session_state.awaiting_cusip = False
         st.session_state.pending_ticker = None
 
-with st.expander("📋 View All Cache Entries"):
+with st.expander("📋 Securities"):
     try:
-        cache_file = project_root / "data" / "raw" / "cusip_cache.csv"
-        if cache_file.exists():
-            df_cache = pd.read_csv(cache_file)
-            st.dataframe(df_cache, use_container_width=True, hide_index=True)
-            st.caption(f"Total entries: {len(df_cache)}")
+        securities_file = project_root / "data" / "processed" / "securities.csv"
+        if securities_file.exists():
+            df_securities = pd.read_csv(securities_file)
+            st.dataframe(df_securities, use_container_width=True, hide_index=True)
+            st.caption(f"Total securities: {len(df_securities)}")
         else:
-            st.info("No entries in cache")
+            st.info("No securities data available. Click 'Consolidate Securities' in the Process Raw Data section below.")
     except Exception as e:
-        st.error(f"Error loading cache: {e}")
+        st.error(f"Error loading securities: {e}")
 
 st.divider()
 
@@ -339,12 +343,125 @@ if st.session_state.get('trigger_price_fetch'):
 st.divider()
 
 # ============================================================================
+# SECTION 3.5: FETCH SECURITY METADATA
+# ============================================================================
+
+st.subheader("📚 Fetch Security Metadata")
+
+# Get metadata fetch status
+metadata_status = get_metadata_fetch_status()
+tickers = get_all_cached_tickers()
+
+# Show status timestamp
+status_time = metadata_status.get('timestamp', '')
+if status_time:
+    try:
+        status_dt = datetime.fromisoformat(status_time)
+        status_display = status_dt.strftime('%H:%M:%S')
+        st.caption(f"Metadata status as of: {status_display}")
+    except:
+        pass
+
+if metadata_status['running']:
+    st.info(f"🔄 Fetching metadata for {len(tickers)} securities (running in background)")
+
+    # Progress bar
+    progress_value = metadata_status['current'] / metadata_status['total'] if metadata_status['total'] > 0 else 0
+    st.progress(progress_value)
+
+    # Status text
+    st.text(f"[{metadata_status['current']}/{metadata_status['total']}] {metadata_status['ticker']}: {metadata_status['message']}")
+    st.caption("Auto-refreshing every 2 seconds...")
+
+    # Auto-refresh every 2 seconds
+    time.sleep(2)
+    st.rerun()
+
+elif metadata_status.get('success_count', 0) > 0:
+    # Completed - show summary
+    success_count = metadata_status.get('success_count', 0)
+    failed_count = len(metadata_status.get('failed_tickers', []))
+
+    st.success(f"✓ Completed: Fetched metadata for {success_count} securities")
+
+    if metadata_status.get('failed_tickers'):
+        with st.expander(f"⚠ {failed_count} Failed Tickers"):
+            st.write(', '.join(metadata_status['failed_tickers']))
+
+else:
+    # Not running, not completed - ready state
+    st.info(f"Ready to fetch metadata for {len(tickers)} securities (31 fields per security)")
+
+# Manual trigger button
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    if st.button("🔄 Fetch Metadata Now", key="fetch_metadata_manual", disabled=metadata_status['running']):
+        # Clear old status and start fresh
+        save_metadata_fetch_status({
+            'running': True,
+            'current': 0,
+            'total': len(tickers),
+            'ticker': 'Starting...',
+            'message': 'Initializing...',
+            'timestamp': datetime.now().isoformat(),
+            'success_count': 0,
+            'failed_tickers': []
+        })
+
+        # Start background fetch
+        subprocess.Popen(
+            [sys.executable, "scripts/background_metadata_fetch.py"],
+            cwd=project_root,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        st.toast("Metadata fetch started!", icon="🚀")
+        time.sleep(0.5)
+        st.rerun()
+
+with col2:
+    if st.button("🔄 Refresh Status", key="refresh_metadata_status", help="Clear completed status and reset to ready state"):
+        # Clear completed status and reset to ready state
+        save_metadata_fetch_status({
+            'running': False,
+            'current': 0,
+            'total': 0,
+            'ticker': '',
+            'message': 'Ready',
+            'timestamp': datetime.now().isoformat(),
+            'success_count': 0,
+            'failed_tickers': []
+        })
+        st.toast("Status cleared!", icon="✅")
+        time.sleep(0.3)
+        st.rerun()
+
+st.divider()
+
+# ============================================================================
 # SECTION 4: PROCESS RAW DATA
 # ============================================================================
 
 st.subheader("⚙️ Process Raw Data")
 
-st.info("Consolidate all raw price files into master prices.csv table")
+st.info("Consolidate raw data files into master tables")
+
+if st.button("Consolidate Securities", key="consolidate_securities"):
+    with st.spinner("Merging CUSIP cache with security metadata..."):
+        result = subprocess.run(
+            [sys.executable, "scripts/consolidate_securities.py"],
+            cwd=project_root,
+            capture_output=True,
+            text=True
+        )
+
+    if result.returncode == 0:
+        st.success("✓ Securities consolidation complete!")
+        st.code(result.stdout)
+    else:
+        st.error("✗ Securities consolidation failed")
+        st.code(result.stderr)
 
 if st.button("Consolidate Prices", key="consolidate_prices"):
     with st.spinner("Consolidating all price files..."):

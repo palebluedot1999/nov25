@@ -5,11 +5,14 @@ A Python-based dashboard for tracking and analyzing hedge fund portfolios using 
 ## Features
 
 - **SEC EDGAR Integration**: Scrape 13F filings directly from SEC EDGAR
-- **Yahoo Finance Integration**: Fetch real-time and historical price data
+- **Yahoo Finance Integration**: Fetch real-time and historical price data with smart incremental updates
+- **Security Metadata Enrichment**: 31 fundamental data fields (sector, industry, financials, ratios)
+- **Background Price Fetching**: Parallel processing (10x faster) with real-time progress tracking
 - **Interactive Dashboard**: Streamlit-based UI viewable in browser
 - **CSV-Only Storage**: Simplified architecture with no database dependencies
 - **Analysis Tools**:
   - Portfolio positions and concentration metrics
+  - Top 10 holdings weight over time visualization
   - P&L calculations
   - Tracking error vs benchmark
   - Filing calendar with 5-year historical data
@@ -29,16 +32,25 @@ project1/
 │   ├── strategies.csv           # Strategy definitions
 │   ├── tags.csv                 # Custom tags for categorization
 │   ├── transactions.csv         # Manual trade entries
-│   ├── raw/
-│   │   ├── cusip_cache.csv      # CUSIP-to-ticker mappings (OpenFIGI)
-│   │   ├── 13f_filings/         # Quarterly holdings CSVs (one per filing)
-│   │   └── sec_13f_filing_periods_*.csv  # Filing calendar data
-│   ├── prices/                  # Price data CSVs (one per ticker)
-│   └── processed/
-│       └── calendar.csv         # Processed filing calendar
+│   ├── raw/                     # Raw data from external sources
+│   │   ├── cusip_cache.csv      # CUSIP↔Ticker mappings (162 entries)
+│   │   ├── security_metadata.csv # Fundamental data (161 securities, 31 fields)
+│   │   ├── price_fetch_status.json # Background price fetch status tracking
+│   │   ├── metadata_fetch_status.json # Background metadata fetch status tracking
+│   │   ├── 13f_filings/         # SEC 13F quarterly holdings (one CSV per filing)
+│   │   └── yahoo_prices/        # Yahoo Finance price data (one CSV per ticker)
+│   └── processed/               # Processed/consolidated data
+│       ├── prices.csv           # Master price table (188K+ records, 162 tickers)
+│       └── securities.csv       # Master securities table (162 entries, CUSIP + metadata)
 ├── scripts/                      # Initialization and backfill scripts
 │   ├── initialize_csv_files.py  # Create CSV data files
-│   └── backfill_historical_holdings.py  # Fetch historical 13F data
+│   ├── backfill_historical_holdings.py # Fetch historical 13F filings
+│   ├── background_price_fetch.py # Background price fetching with status tracking
+│   ├── background_metadata_fetch.py # Background metadata fetching with status tracking
+│   ├── fetch_all_prices.py      # Bulk fetch 5yr prices for all holdings
+│   ├── fetch_security_metadata.py # Fetch fundamental data from Yahoo Finance
+│   ├── consolidate_prices.py    # Merge individual price files into master table
+│   └── consolidate_securities.py # Merge CUSIP cache + metadata into securities.csv
 ├── analysis/                     # Analysis modules
 │   ├── pnl.py                   # P&L calculations
 │   ├── positions.py             # Position analysis
@@ -46,16 +58,23 @@ project1/
 ├── dashboard/                    # Streamlit dashboard
 │   ├── app.py                   # Main dashboard app
 │   ├── pages/                   # Dashboard pages
-│   │   ├── 1_📊_Overview.py
-│   │   ├── 2_📈_Positions.py    # Includes trade entry form
+│   │   ├── 1_📊_Overview.py     # Portfolio summary with top holdings chart
+│   │   ├── 2_📈_Positions.py    # Current holdings with trade entry form
 │   │   ├── 3_💰_P&L_Analysis.py
 │   │   ├── 4_📉_Tracking_Error.py
 │   │   ├── 5_📅_Calendar.py
-│   │   └── 6_⚙️_Data_Management.py
+│   │   └── 6_⚙️_Data_Management.py # Smart price pull, security addition, fund batch processing
 │   └── components/              # Reusable UI components
 ├── utils/                        # Utilities
 │   ├── csv_data.py              # CSV data layer (replaces database)
-│   └── data_processing.py       # Data transformations
+│   ├── data_processing.py       # Data transformations
+│   ├── price_operations.py      # Smart incremental price fetching with parallel processing
+│   ├── security_operations.py   # Security addition with OpenFIGI CUSIP/ticker lookup
+│   ├── metadata_operations.py   # Fetch and manage security fundamental data with background processing
+│   ├── security_consolidation.py # Merge CUSIP cache with metadata into master securities table
+│   └── fund_operations.py       # Batch CIK processing and portfolio creation
+├── tests/                        # Unit tests
+│   └── test_security_operations.py # Security operations tests (11 tests)
 ├── requirements.txt              # Dependencies
 └── README.md
 ```
@@ -67,8 +86,8 @@ project1/
 - **Storage**: CSV-only (no database)
 - **Data Sources**:
   - SEC EDGAR (13F filings)
-  - Yahoo Finance (price data)
-  - OpenFIGI API (CUSIP-to-ticker mapping)
+  - Yahoo Finance (price data and fundamental metadata)
+  - OpenFIGI API (CUSIP-to-ticker mapping, optional)
 
 ## Setup
 
@@ -121,6 +140,16 @@ python scripts/backfill_historical_holdings.py
 
 This downloads 20 quarterly filings (2021-2025) to `data/raw/13f_filings/`.
 
+### 7. Fetch security metadata (optional)
+
+To enrich securities with fundamental data (sector, industry, financials):
+
+```bash
+python scripts/fetch_security_metadata.py
+```
+
+This fetches 31 fundamental fields for all 161 securities and saves to `data/raw/security_metadata.csv`.
+
 ## Usage
 
 ### Running the Dashboard
@@ -133,20 +162,28 @@ The dashboard will open in your browser at `http://localhost:8501`.
 
 ### Dashboard Pages
 
-1. **Overview**: Portfolio summary and key metrics
-2. **Positions**: Current holdings with trade entry form
+1. **Overview**: Portfolio summary, key metrics, and top 10 holdings weight over time chart
+2. **Positions**: Current holdings with manual trade entry form
 3. **P&L Analysis**: Performance calculations
 4. **Tracking Error**: Benchmark comparison vs XBI
 5. **Calendar**: SEC filing calendar and history
-6. **Data Management**: Fetch new filings and manage data
+6. **Data Management**:
+   - Smart Price Pull: Background fetching with parallel processing and progress tracking
+   - Add New Security: Ticker/CUSIP resolution via OpenFIGI API with Securities view
+   - Add Fund Portfolio: Batch CIK processing with auto-name fetching
+   - Fetch Security Metadata: Background fetch of 31 fundamental fields with progress tracking
+   - Process Raw Data: Consolidate securities and price files into master tables
 
 ### Fetching New Data
 
 From the **Data Management** page:
 
-1. **Fetch Latest 13F Filing**: Download most recent filing from SEC EDGAR
-2. **Fetch Filing Calendar**: Update 13F filing due dates
-3. **Fetch Benchmark Prices**: Get XBI price data for comparison
+1. **Smart Price Pull**: Automatically fetches missing price data for all 162 securities using parallel processing (10x faster). Runs in background with real-time progress tracking.
+2. **Add New Security**: Add securities by ticker or CUSIP. CUSIP→ticker auto-resolved via OpenFIGI API. View all securities in the Securities expander.
+3. **Add Fund Portfolio**: Batch add multiple funds by CIK with automatic SEC name lookup and holdings download.
+4. **Fetch Security Metadata**: Background fetch of 31 fundamental fields (sector, industry, financials) for all securities. Takes ~1-2 minutes with rate limiting.
+5. **Consolidate Securities**: Merge CUSIP cache with metadata into master `securities.csv` table (162 entries, 32 columns).
+6. **Consolidate Prices**: Merge individual ticker price files into master `prices.csv` table.
 
 ### Manual Trade Entry
 
@@ -183,6 +220,13 @@ The project is pre-configured to track:
 - **Baker Bros. Advisors LP** (CIK: 1263508)
 - **Benchmark**: XBI (SPDR S&P Biotech ETF)
 - **Historical Data**: 20 quarterly filings (Q1 2021 - Q3 2025)
+- **Securities**: 162 total (161 holdings + XBI benchmark)
+  - 160 with full metadata (31 fields)
+  - 2 without metadata (newly added)
+- **Price Data**: 188K+ records across 162 tickers
+- **Master Tables**:
+  - `securities.csv`: 162 rows × 32 columns (CUSIP + ticker + metadata)
+  - `prices.csv`: 188K+ rows × 10 columns (price history)
 
 ## Adding More Funds
 
@@ -233,9 +277,24 @@ baker-bros,Baker Bros. Advisors LP,1263508,XBI,true
 ## Data Sources
 
 - **SEC EDGAR**: 13F-HR filings (quarterly institutional holdings)
-- **Yahoo Finance**: Stock prices and benchmark data
-- **OpenFIGI**: CUSIP-to-ticker symbol mapping
+- **Yahoo Finance**: Stock prices, benchmark data, and fundamental metadata (31 fields)
+- **OpenFIGI**: CUSIP-to-ticker symbol mapping (optional, API key recommended)
 - **Future**: Whale Wisdom, DataRoma
+
+## Current Data Coverage
+
+- **Securities**: 162 total from Baker Bros portfolio + benchmark
+  - Holdings: 161 securities
+  - Benchmark: XBI (SPDR S&P Biotech ETF)
+  - With metadata: 160 securities
+  - Without metadata: 2 securities (newly added)
+- **Price Records**: 188K+ historical price records (5 years)
+- **Metadata Fields**: 31 fundamental data points per security
+  - Company info, market data, valuation ratios, financials, balance sheet, institutional holdings
+- **Historical Period**: 5 years (2021-2025, 20 quarterly filings)
+- **Master Tables**:
+  - `securities.csv`: Complete security reference with CUSIP, ticker, and metadata
+  - `prices.csv`: All historical price data consolidated
 
 ## Important Notes
 
@@ -250,8 +309,18 @@ baker-bros,Baker Bros. Advisors LP,1263508,XBI,true
 ### Running Tests
 
 ```bash
-pytest tests/
+# Run all tests
+pytest tests/ -v
+
+# Run specific test file
+pytest tests/test_security_operations.py -v
+
+# With coverage
+pytest tests/ --cov=utils --cov=scrapers
 ```
+
+Current test coverage:
+- `tests/test_security_operations.py` - 11 tests for CUSIP/ticker resolution (all passing)
 
 ### Code Structure
 
@@ -268,8 +337,15 @@ pytest tests/
 - [ ] Add DataRoma scraper
 - [ ] Historical position change visualization (QoQ analysis)
 - [ ] Multi-fund comparison view
-- [ ] Interactive Plotly charts
-- [ ] Unit tests for scrapers and analysis modules
+- [ ] More interactive Plotly charts
+- [ ] More unit tests for scrapers and analysis modules
+- [x] ~~CUSIP-to-ticker mapping~~ (✓ Implemented via OpenFIGI API)
+- [x] ~~CSV-only storage migration~~ (✓ Complete - database removed)
+- [x] ~~Background price fetching~~ (✓ Parallel processing with status tracking)
+- [x] ~~Security metadata enrichment~~ (✓ 31 fundamental fields from Yahoo Finance)
+- [x] ~~Securities master table~~ (✓ Consolidated CUSIP + ticker + metadata)
+- [x] ~~Background metadata fetching~~ (✓ Real-time progress tracking)
+- [x] ~~Unit tests for security operations~~ (✓ 11 tests passing)
 
 ## License
 

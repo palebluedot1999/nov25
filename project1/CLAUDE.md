@@ -9,6 +9,9 @@ Hedge fund portfolio tracker that scrapes SEC 13F filings and displays analysis 
 - **Benchmark**: XBI (SPDR S&P Biotech ETF)
 - **Python**: 3.12.10 (installed via `py install 3.12`)
 - **Historical Data**: 5 years (20 quarterly filings from 2021-2025)
+- **Securities**: 161 holdings + 1 benchmark (XBI)
+- **Price Data**: 188K+ records across 162 tickers
+- **Fundamental Data**: 31 fields for all 161 securities
 
 ## Setup Instructions
 ```bash
@@ -20,6 +23,9 @@ python scripts/initialize_csv_files.py
 
 # Backfill historical holdings (if needed)
 python scripts/backfill_historical_holdings.py
+
+# Fetch security metadata (optional - enriches with fundamentals)
+python scripts/fetch_security_metadata.py
 
 # Run dashboard
 streamlit run dashboard/app.py
@@ -37,11 +43,17 @@ streamlit run dashboard/app.py
 - `scrapers/yahoo_finance.py` - Price data fetcher
 - `utils/csv_data.py` - CSV data layer (replaces database)
 - `utils/data_processing.py` - Data transformation utilities
-- `utils/price_operations.py` - Smart incremental price fetching logic
-- `utils/security_operations.py` - Security addition with OpenFIGI bi-directional lookup
+- `utils/price_operations.py` - Smart incremental price fetching with parallel processing
+- `utils/security_operations.py` - Security addition with OpenFIGI CUSIP/ticker lookup
+- `utils/metadata_operations.py` - Fetch and manage security fundamental data with background processing
+- `utils/security_consolidation.py` - Merge CUSIP cache with metadata into master securities table
 - `utils/fund_operations.py` - Batch CIK processing and portfolio creation
+- `scripts/background_price_fetch.py` - Background price fetching with status tracking
+- `scripts/background_metadata_fetch.py` - Background metadata fetching with status tracking
 - `scripts/fetch_all_prices.py` - Bulk fetch 5yr prices for all holdings
+- `scripts/fetch_security_metadata.py` - Fetch fundamental data from Yahoo Finance
 - `scripts/consolidate_prices.py` - Merge individual price files into master table
+- `scripts/consolidate_securities.py` - Merge CUSIP cache + metadata into securities.csv
 - `data/portfolios.csv` - Portfolio definitions
 - `data/holdings/*.csv` - Historical quarterly holdings (one per filing)
 
@@ -53,7 +65,10 @@ data/
 ├── tags.csv                    # Custom tags
 ├── transactions.csv            # Manual trade entries
 ├── raw/                        # Raw data from external sources
-│   ├── cusip_cache.csv         # CUSIP↔Ticker mapping cache (160+ entries)
+│   ├── cusip_cache.csv         # CUSIP↔Ticker mapping (162 entries)
+│   ├── security_metadata.csv  # Fundamental data: sector, industry, financials (161 entries, 31 fields)
+│   ├── price_fetch_status.json # Background price fetch status
+│   ├── metadata_fetch_status.json # Background metadata fetch status
 │   ├── 13f_filings/            # SEC 13F filings (one CSV per quarter)
 │   │   ├── baker-bros_2021-02-16_holdings.csv
 │   │   ├── baker-bros_2021-05-17_holdings.csv
@@ -61,9 +76,10 @@ data/
 │   └── yahoo_prices/           # Yahoo Finance price data (one CSV per ticker)
 │       ├── AAPL.csv
 │       ├── XBI.csv
-│       └── ... (160 ticker files)
+│       └── ... (162 ticker files including benchmark)
 └── processed/                  # Processed/consolidated data
-    └── prices.csv              # Master price table (all tickers consolidated with source column)
+    ├── prices.csv              # Master price table (188K+ records, 162 tickers)
+    └── securities.csv          # Master securities table (162 entries, CUSIP + ticker + 31 metadata fields)
 ```
 
 ## Design Decisions
@@ -76,19 +92,40 @@ data/
 ## What's Working
 - SEC EDGAR scraper for 13F filings (saves to CSV with dates)
 - Yahoo Finance price fetcher (saves to CSV)
-- **Bulk price fetcher** for all 160 holdings (5 years of data)
+- **Background price fetching** with 10x parallel processing and real-time status tracking
 - **Smart incremental price updates** - Only fetches missing dates (checks raw files first, falls back to processed)
-- **Price consolidation** into master prices.csv table (185K+ records)
+- **Security metadata enrichment** - 31 fundamental fields (sector, industry, financials, ratios)
+- **Price consolidation** into master prices.csv table (188K+ records)
 - CSV data layer with all operations (portfolios, holdings, prices, transactions)
 - Dashboard with Overview, Positions, Calendar, Data Management pages
 - **Top 10 Holdings Weight Over Time** chart on Overview page
 - **Trade entry form** on Positions page (date, time, ticker, direction, quantity, price, cost, strategy)
 - Historical holdings view (20 quarters of Baker Bros data)
-- **Redesigned Data Management page** with 4 sections:
-  - Smart Price Pull: Incremental updates with progress tracking
-  - Add New Security: Ticker/CUSIP resolution (see details below)
+- **Redesigned Data Management page** with 5 sections:
+  - Smart Price Pull: Background fetch with auto-run, progress tracking, and manual trigger
+  - Add New Security: Ticker/CUSIP resolution with Securities view (see details below)
   - Add Fund Portfolio: Batch CIK processing with auto-name fetching from SEC
-  - Process Raw Data: Consolidate raw files into master tables
+  - Fetch Security Metadata: Background fetch of 31 fundamental fields with progress tracking
+  - Process Raw Data: Consolidate raw files into master tables (Securities + Prices)
+
+### Securities Master Table
+Consolidated view of all securities with full metadata in Data Management page:
+
+**What it is:**
+- Single master table combining CUSIP cache + security metadata
+- File: `data/processed/securities.csv`
+- 162 securities total (161 holdings + XBI benchmark)
+- 32 columns: CUSIP, ticker, company_name, sector, industry, + 27 metadata fields
+
+**How to update:**
+1. Add new securities via "Add New Security" form (updates CUSIP cache)
+2. Click "Fetch Metadata Now" to get fundamental data for all securities
+3. Click "Consolidate Securities" to merge CUSIP + metadata into master table
+4. View complete data in "📋 Securities" expander
+
+**Location:** Data Management page → "📋 Securities" expander
+**Backend:** `utils/security_consolidation.py` + `scripts/consolidate_securities.py`
+**Data Flow:** `cusip_cache.csv` + `security_metadata.csv` → LEFT JOIN → `securities.csv`
 
 ### Add New Security Feature
 Smart CUSIP/ticker resolution system in Data Management page:
@@ -111,7 +148,53 @@ Smart CUSIP/ticker resolution system in Data Management page:
 
 **Location:** `dashboard/pages/6_⚙️_Data_Management.py`
 **Backend:** `utils/security_operations.py`
-**Cache:** `data/raw/cusip_cache.csv` (160+ entries)
+**Cache:** `data/raw/cusip_cache.csv` (162 entries)
+
+### Fetch Security Metadata Feature
+Background metadata fetching with real-time progress tracking in Data Management page:
+
+**How it works:**
+- Click "🔄 Fetch Metadata Now" button
+- Runs in background via `scripts/background_metadata_fetch.py`
+- Fetches 31 fundamental fields for all 162 securities from Yahoo Finance
+- Progress bar updates every 2 seconds
+- Takes ~1-2 minutes (0.5s rate limit between requests)
+- Status tracked in `data/raw/metadata_fetch_status.json`
+
+**After completion:**
+- Click "Consolidate Securities" to merge into master table
+- View results in "📋 Securities" expander
+
+**Location:** Data Management page → "📚 Fetch Security Metadata" section
+**Backend:** `scripts/background_metadata_fetch.py` + `utils/metadata_operations.py`
+
+**31 Data Fields Fetched:**
+- **Company Info**: Name, sector, industry, website, business summary
+- **Market Data**: Market cap, beta, shares outstanding, float shares, exchange
+- **Valuation**: P/E ratio, forward P/E, price-to-book, dividend yield
+- **Financial**: Revenue, EBITDA, profit margin, operating margin, ROE, ROA
+- **Balance Sheet**: Debt-to-equity, current ratio
+- **Institutional**: Held by institutions/insiders, short interest, short ratio
+- **Dividends**: Rate, payout ratio
+- **Metadata**: Last updated timestamp
+
+**Features:**
+- Bulk fetch for all securities in CUSIP cache
+- Automatic updates and merging (keeps latest)
+- Rate limiting to respect API limits
+- Used for sector allocation, valuation analysis, portfolio insights
+
+**Files:**
+- **Raw Data**: `data/raw/security_metadata.csv` (161 securities, 31 fields)
+- **Processed Data**: `data/processed/securities.csv` (162 securities with CUSIP + metadata merged)
+- **Status File**: `data/raw/metadata_fetch_status.json` (background fetch progress)
+- **Scripts**:
+  - Background: `python scripts/background_metadata_fetch.py`
+  - Interactive: `python scripts/fetch_security_metadata.py`
+- **Backend**: `utils/metadata_operations.py`
+
+**Current coverage:** 160 securities with metadata, 2 without (newly added CUSIPs)
+**Sector breakdown:** Predominantly Healthcare/Biotechnology sector
 
 ## Testing
 
