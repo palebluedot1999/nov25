@@ -13,6 +13,8 @@ from typing import Optional, List, Dict
 from datetime import datetime, timedelta
 import pandas as pd
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -24,6 +26,7 @@ from scrapers.yahoo_finance import YahooFinanceFetcher
 
 PROCESSED_PRICES_FILE = project_root / "data" / "processed" / "prices.csv"
 CUSIP_CACHE_FILE = project_root / "data" / "raw" / "cusip_cache.csv"
+PRICE_FETCH_STATUS_FILE = project_root / "data" / "raw" / "price_fetch_status.json"
 
 
 def get_latest_price_date(ticker: str) -> Optional[str]:
@@ -162,12 +165,13 @@ def fetch_incremental_prices(ticker: str, start_from="2020-01-01") -> Dict:
         }
 
 
-def fetch_all_incremental_prices(progress_callback=None) -> Dict:
+def fetch_all_incremental_prices(progress_callback=None, max_workers=10) -> Dict:
     """
-    Fetch incremental prices for all tickers in cusip_cache.
+    Fetch incremental prices for all tickers in cusip_cache using parallel processing.
 
     Args:
         progress_callback: Optional function(current, total, ticker, status_msg)
+        max_workers: Number of parallel workers (default: 10)
 
     Returns:
         Dict with keys:
@@ -189,35 +193,102 @@ def fetch_all_incremental_prices(progress_callback=None) -> Dict:
     success_count = 0
     failed_tickers = []
     total_records = 0
+    completed = 0
 
-    for i, ticker in enumerate(tickers, 1):
-        # Update progress
-        if progress_callback:
-            progress_callback(i, len(tickers), ticker, "Fetching...")
+    # Use ThreadPoolExecutor for parallel fetching
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_ticker = {
+            executor.submit(fetch_incremental_prices, ticker): ticker
+            for ticker in tickers
+        }
 
-        # Fetch incremental prices
-        result = fetch_incremental_prices(ticker)
+        # Process completed tasks
+        for future in as_completed(future_to_ticker):
+            ticker = future_to_ticker[future]
+            completed += 1
 
-        if result['success']:
-            success_count += 1
-            total_records += result['records_added']
+            try:
+                result = future.result()
 
-            if progress_callback:
-                progress_callback(i, len(tickers), ticker, result['message'])
-        else:
-            failed_tickers.append(ticker)
+                if result['success']:
+                    success_count += 1
+                    total_records += result['records_added']
 
-            if progress_callback:
-                progress_callback(i, len(tickers), ticker, f"FAILED: {result['message']}")
+                    if progress_callback:
+                        progress_callback(completed, len(tickers), ticker, result['message'])
+                else:
+                    failed_tickers.append(ticker)
 
-        # Rate limiting
-        time.sleep(0.2)
+                    if progress_callback:
+                        progress_callback(completed, len(tickers), ticker, f"FAILED: {result['message']}")
+
+            except Exception as e:
+                failed_tickers.append(ticker)
+                if progress_callback:
+                    progress_callback(completed, len(tickers), ticker, f"ERROR: {str(e)}")
 
     return {
         'total_tickers': len(tickers),
         'success_count': success_count,
         'failed_tickers': failed_tickers,
         'total_records_added': total_records
+    }
+
+
+def save_fetch_status(status: Dict):
+    """
+    Save price fetch status to file.
+
+    Args:
+        status: Dict with status information
+    """
+    try:
+        PRICE_FETCH_STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(PRICE_FETCH_STATUS_FILE, 'w') as f:
+            json.dump(status, f, indent=2)
+    except Exception as e:
+        print(f"Error saving fetch status: {e}")
+
+
+def load_fetch_status() -> Optional[Dict]:
+    """
+    Load price fetch status from file.
+
+    Returns:
+        Status dict or None if file doesn't exist
+    """
+    try:
+        if PRICE_FETCH_STATUS_FILE.exists():
+            with open(PRICE_FETCH_STATUS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading fetch status: {e}")
+    return None
+
+
+def get_fetch_status() -> Dict:
+    """
+    Get current fetch status with default values.
+
+    Returns:
+        Dict with keys: running, completed, current, total, ticker, message, timestamp
+    """
+    status = load_fetch_status()
+    if status:
+        return status
+
+    return {
+        'running': False,
+        'completed': 0,
+        'current': 0,
+        'total': 0,
+        'ticker': '',
+        'message': 'Not started',
+        'timestamp': datetime.now().isoformat(),
+        'success_count': 0,
+        'failed_tickers': [],
+        'total_records_added': 0
     }
 
 

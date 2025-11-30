@@ -53,6 +53,7 @@ data/
 ├── tags.csv                    # Custom tags
 ├── transactions.csv            # Manual trade entries
 ├── raw/                        # Raw data from external sources
+│   ├── cusip_cache.csv         # CUSIP↔Ticker mapping cache (160+ entries)
 │   ├── 13f_filings/            # SEC 13F filings (one CSV per quarter)
 │   │   ├── baker-bros_2021-02-16_holdings.csv
 │   │   ├── baker-bros_2021-05-17_holdings.csv
@@ -85,9 +86,61 @@ data/
 - Historical holdings view (20 quarters of Baker Bros data)
 - **Redesigned Data Management page** with 4 sections:
   - Smart Price Pull: Incremental updates with progress tracking
-  - Add New Security: Bi-directional ticker↔CUSIP resolution via OpenFIGI API
+  - Add New Security: Ticker/CUSIP resolution (see details below)
   - Add Fund Portfolio: Batch CIK processing with auto-name fetching from SEC
   - Process Raw Data: Consolidate raw files into master tables
+
+### Add New Security Feature
+Smart CUSIP/ticker resolution system in Data Management page:
+
+**How it works:**
+- **CUSIP → Ticker**: Auto-resolved via OpenFIGI API ✓
+  - Primary use case: 13F filings provide CUSIPs
+  - Works perfectly for adding securities from SEC filings
+- **Ticker → CUSIP**: Cache lookup only
+  - Checks `data/raw/cusip_cache.csv` first
+  - If not found, prompts for manual CUSIP entry
+  - Note: OpenFIGI and Yahoo Finance APIs don't provide CUSIP data (proprietary)
+- **Both provided**: Added directly to cache
+
+**Why this approach:**
+- CUSIP data is proprietary (managed by CUSIP Global Services)
+- Free APIs (OpenFIGI, Yahoo Finance) don't return CUSIPs
+- For 13F filings workflow, we always have the CUSIP
+- Manual entry fallback allows flexibility for edge cases
+
+**Location:** `dashboard/pages/6_⚙️_Data_Management.py`
+**Backend:** `utils/security_operations.py`
+**Cache:** `data/raw/cusip_cache.csv` (160+ entries)
+
+## Testing
+
+Unit tests are located in the `tests/` directory.
+
+### Running Tests
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run specific test file
+pytest tests/test_security_operations.py -v
+
+# With coverage (requires pytest-cov)
+pytest tests/ --cov=utils --cov=scrapers
+```
+
+### Test Files
+- `tests/test_security_operations.py` - CUSIP/ticker resolution tests (11 tests)
+  - Tests CUSIP→ticker auto-resolution via OpenFIGI
+  - Tests ticker→CUSIP cache lookup
+  - Tests input validation and edge cases
+  - Tests adding securities to cache
+  - All tests passing ✓
+
+### Requirements
+```bash
+pip install pytest pytest-cov
+```
 
 ## Next Steps / Future Enhancements
 - [ ] Update P&L and tracking error analysis modules to use CSV storage
@@ -96,9 +149,10 @@ data/
 - [ ] Add more interactive Plotly charts
 - [ ] Historical position change visualization (QoQ analysis)
 - [ ] Multi-fund comparison view
-- [ ] Unit tests for scrapers and analysis
+- [ ] More unit tests for scrapers and analysis modules
 - [x] ~~CUSIP-to-ticker mapping~~ (✓ Implemented via OpenFIGI API)
 - [x] ~~CSV-only storage migration~~ (✓ Complete - database removed)
+- [x] ~~Unit tests for security operations~~ (✓ 11 tests passing)
 
 ## User Preferences
 - Wants flexibility to add more funds later
@@ -109,3 +163,5 @@ data/
 - SEC requires User-Agent with contact email (configured in settings.py)
 - 13F filings are quarterly, ~45 days after quarter end
 - Values in 13F are reported in thousands (scraper multiplies by 1000)
+- OpenFIGI API key is optional but recommended (set `OPENFIGI_API_KEY` env var)
+- CUSIP cache auto-builds from 13F filings and can be viewed/edited in Data Management page
