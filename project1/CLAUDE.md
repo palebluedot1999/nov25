@@ -226,7 +226,7 @@ pip install pytest pytest-cov
 ```
 
 ## Next Steps / Future Enhancements
-- [ ] Update P&L and tracking error analysis modules to use CSV storage
+- [ ] Implement P&L and tracking error analysis (currently placeholders in dashboard)
 - [ ] Add Whale Wisdom scraper
 - [ ] Add DataRoma scraper
 - [ ] Add more interactive Plotly charts

@@ -51,10 +51,6 @@ project1/
 │   ├── fetch_security_metadata.py # Fetch fundamental data from Yahoo Finance
 │   ├── consolidate_prices.py    # Merge individual price files into master table
 │   └── consolidate_securities.py # Merge CUSIP cache + metadata into securities.csv
-├── analysis/                     # Analysis modules
-│   ├── pnl.py                   # P&L calculations
-│   ├── positions.py             # Position analysis
-│   └── tracking_error.py        # Benchmark comparison
 ├── dashboard/                    # Streamlit dashboard
 │   ├── app.py                   # Main dashboard app
 │   ├── pages/                   # Dashboard pages
@@ -326,13 +322,12 @@ Current test coverage:
 
 - **Scrapers**: Fetch raw data from external sources
 - **Utils**: Data layer (`csv_data.py`) and transformations
-- **Analysis**: Portfolio calculations and metrics
 - **Dashboard**: Streamlit UI and visualization
 - **Scripts**: One-time setup and backfill operations
 
 ## Future Enhancements
 
-- [ ] Complete P&L and tracking error analysis modules for CSV storage
+- [ ] Implement P&L and tracking error analysis (currently placeholders in dashboard)
 - [ ] Add Whale Wisdom scraper
 - [ ] Add DataRoma scraper
 - [ ] Historical position change visualization (QoQ analysis)
