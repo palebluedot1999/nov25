@@ -4,7 +4,9 @@
       "Bash(source .venv/Scripts/activate)",
       "Bash(python utils/migrate_json_to_csv.py:*)",
       "Bash(python:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

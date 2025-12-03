@@ -54,12 +54,12 @@ project1/
 ├── dashboard/                    # Streamlit dashboard
 │   ├── app.py                   # Main dashboard app
 │   ├── pages/                   # Dashboard pages
-│   │   ├── 1_📊_Overview.py     # Portfolio summary with top holdings chart
-│   │   ├── 2_📈_Positions.py    # Current holdings with trade entry form
-│   │   ├── 3_💰_P&L_Analysis.py
-│   │   ├── 4_📉_Tracking_Error.py
-│   │   ├── 5_📅_Calendar.py
-│   │   └── 6_⚙️_Data_Management.py # Smart price pull, security addition, fund batch processing
+│   │   ├── 1_Overview.py        # Portfolio summary with top holdings chart
+│   │   ├── 2_Positions.py       # Current holdings with trade entry form
+│   │   ├── 3_PnL_Analysis.py
+│   │   ├── 4_Tracking_Error.py
+│   │   ├── 5_Calendar.py
+│   │   └── 6_Data_Management.py # Smart price pull, security addition, fund batch processing
 │   └── components/              # Reusable UI components
 ├── utils/                        # Utilities
 │   ├── csv_data.py              # CSV data layer (replaces database)
@@ -334,13 +334,13 @@ Current test coverage:
 - [ ] Multi-fund comparison view
 - [ ] More interactive Plotly charts
 - [ ] More unit tests for scrapers and analysis modules
-- [x] ~~CUSIP-to-ticker mapping~~ (✓ Implemented via OpenFIGI API)
-- [x] ~~CSV-only storage migration~~ (✓ Complete - database removed)
-- [x] ~~Background price fetching~~ (✓ Parallel processing with status tracking)
-- [x] ~~Security metadata enrichment~~ (✓ 31 fundamental fields from Yahoo Finance)
-- [x] ~~Securities master table~~ (✓ Consolidated CUSIP + ticker + metadata)
-- [x] ~~Background metadata fetching~~ (✓ Real-time progress tracking)
-- [x] ~~Unit tests for security operations~~ (✓ 11 tests passing)
+- [x] ~~CUSIP-to-ticker mapping~~ (Implemented via OpenFIGI API)
+- [x] ~~CSV-only storage migration~~ (Complete - database removed)
+- [x] ~~Background price fetching~~ (Parallel processing with status tracking)
+- [x] ~~Security metadata enrichment~~ (31 fundamental fields from Yahoo Finance)
+- [x] ~~Securities master table~~ (Consolidated CUSIP + ticker + metadata)
+- [x] ~~Background metadata fetching~~ (Real-time progress tracking)
+- [x] ~~Unit tests for security operations~~ (11 tests passing)
 
 ## License
 

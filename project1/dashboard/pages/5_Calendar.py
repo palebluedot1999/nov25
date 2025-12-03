@@ -16,7 +16,7 @@ from utils.data_processing import get_historical_filings_dataframe
 from utils.csv_data import load_portfolios
 from config.settings import DATA_DIR
 
-st.title("📅 Filing Calendar")
+st.title("Filing Calendar")
 
 # Load SEC 13F filing calendar
 calendar_file = DATA_DIR / "processed" / "calendar.csv"
@@ -48,7 +48,7 @@ if calendar_file.exists():
             st.markdown(f"**Period:**")
             st.markdown(f"{quarter_data['Start Date']} - {quarter_data['End Date']}")
             st.markdown(f"**Filing Deadline:**")
-            st.markdown(f"📌 {quarter_data['Filing Deadline']}")
+            st.markdown(f"{quarter_data['Filing Deadline']}")
 
     st.divider()
 

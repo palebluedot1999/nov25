@@ -44,7 +44,7 @@ st.title("Data Management")
 # SECTION 1: SMART PRICE PULL (Background Task)
 # ============================================================================
 
-st.subheader("📊 Smart Price Pull (Auto-Running in Background)")
+st.subheader("Smart Price Pull (Auto-Running in Background)")
 
 # Auto-start background fetch on page load if not already running
 fetch_status = get_fetch_status()
@@ -98,7 +98,7 @@ if st.session_state.get('last_refresh'):
     st.caption(f"Page refreshed: {st.session_state.last_refresh}")
 
 if fetch_status['running']:
-    st.info(f"🔄 Fetching prices for {len(tickers)} securities (running in background, **10x faster with parallel processing**)")
+    st.info(f"Fetching prices for {len(tickers)} securities (running in background, **10x faster with parallel processing**)")
 
     # Progress bar
     progress_value = fetch_status['current'] / fetch_status['total'] if fetch_status['total'] > 0 else 0
@@ -124,13 +124,13 @@ elif fetch_status.get('success_count', 0) > 0:
     new_tickers = tickers_in_cache - tickers_processed
 
     if new_tickers > 0:
-        st.info(f"📊 {len(tickers)} securities in cache ({new_tickers} added since last fetch)")
-        st.warning(f"💡 Click 'Fetch Prices Now' to update prices for newly added securities")
+        st.info(f"{len(tickers)} securities in cache ({new_tickers} added since last fetch)")
+        st.warning(f"Click 'Fetch Prices Now' to update prices for newly added securities")
     else:
-        st.success(f"✓ Completed: Fetched {records_added} new records for {success_count} tickers")
+        st.success(f"Completed: Fetched {records_added} new records for {success_count} tickers")
 
         if fetch_status.get('failed_tickers'):
-            with st.expander(f"⚠ {failed_count} Failed Tickers"):
+            with st.expander(f"{failed_count} Failed Tickers"):
                 st.write(', '.join(fetch_status['failed_tickers']))
 
 else:
@@ -141,7 +141,7 @@ else:
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    if st.button("🔄 Fetch Prices Now", key="fetch_prices_manual", disabled=fetch_status['running']):
+    if st.button("Fetch Prices Now", key="fetch_prices_manual", disabled=fetch_status['running']):
         # Clear old status and start fresh
         save_fetch_status({
             'running': True,
@@ -164,12 +164,12 @@ with col1:
             stderr=subprocess.DEVNULL
         )
         st.session_state.last_refresh = datetime.now().strftime('%H:%M:%S')
-        st.toast("Price fetch started!", icon="🚀")
+        st.toast("Price fetch started!")
         time.sleep(0.5)
         st.rerun()
 
 with col2:
-    if st.button("🔄 Refresh Status", key="refresh_status", help="Clear completed status and reset to ready state"):
+    if st.button("Refresh Status", key="refresh_status", help="Clear completed status and reset to ready state"):
         # Clear completed status and reset to ready state
         save_fetch_status({
             'running': False,
@@ -184,7 +184,7 @@ with col2:
             'total_records_added': 0
         })
         st.session_state.last_refresh = datetime.now().strftime('%H:%M:%S')
-        st.toast("Status cleared!", icon="✅")
+        st.toast("Status cleared!")
         time.sleep(0.3)  # Brief pause so user sees the toast
         st.rerun()
 
@@ -194,14 +194,14 @@ st.divider()
 # SECTION 2: ADD NEW SECURITY
 # ============================================================================
 
-st.subheader("🔍 Add New Security")
+st.subheader("Add New Security")
 
 cache_summary = get_cusip_cache_summary()
 st.info(f"{cache_summary['total_entries']} securities in cache • Last updated: {cache_summary['last_modified']}")
 
 st.markdown("""
 **How it works:**
-- **CUSIP → Ticker**: Auto-resolved via OpenFIGI API ✓
+- **CUSIP → Ticker**: Auto-resolved via OpenFIGI API
 - **Ticker → CUSIP**: Checked in cache (manual entry required if not found)
 - **Both provided**: Added directly to cache
 """)
@@ -224,7 +224,7 @@ with col2:
 
 # Show session state for manual CUSIP entry flow
 if st.session_state.get('awaiting_cusip'):
-    st.warning(f"⚠ Please enter CUSIP for {st.session_state.get('pending_ticker')}")
+    st.warning(f"Please enter CUSIP for {st.session_state.get('pending_ticker')}")
 
 if st.button("Add to Cache", disabled=(not ticker_input and not cusip_input), key="add_security"):
     with st.spinner("Resolving..."):
@@ -234,22 +234,22 @@ if st.button("Add to Cache", disabled=(not ticker_input and not cusip_input), ke
         )
 
     if result['success']:
-        st.success(f"✓ {result['message']}")
+        st.success(f"{result['message']}")
         # Clear any pending state
         st.session_state.awaiting_cusip = False
         st.session_state.pending_ticker = None
         st.rerun()
     elif result.get('needs_cusip'):
         # Ticker provided but CUSIP not in cache
-        st.warning(f"⚠ {result['message']}")
+        st.warning(f"{result['message']}")
         st.session_state.awaiting_cusip = True
         st.session_state.pending_ticker = result['ticker']
     else:
-        st.error(f"✗ {result['message']}")
+        st.error(f"{result['message']}")
         st.session_state.awaiting_cusip = False
         st.session_state.pending_ticker = None
 
-with st.expander("📋 Securities"):
+with st.expander("Securities"):
     try:
         securities_file = project_root / "data" / "processed" / "securities.csv"
         if securities_file.exists():
@@ -267,7 +267,7 @@ st.divider()
 # SECTION 3: ADD FUND PORTFOLIO (BATCH MODE)
 # ============================================================================
 
-st.subheader("📈 Add Fund Portfolio (Batch Mode)")
+st.subheader("Add Fund Portfolio (Batch Mode)")
 
 cik_input = st.text_area(
     "Enter CIKs (comma-separated)",
@@ -279,7 +279,7 @@ cik_input = st.text_area(
 ciks = parse_cik_input(cik_input) if cik_input else []
 
 if ciks:
-    st.success(f"✓ {len(ciks)} valid CIKs entered: {', '.join(ciks)}")
+    st.success(f"{len(ciks)} valid CIKs entered: {', '.join(ciks)}")
 
 col1, col2 = st.columns(2)
 
@@ -318,20 +318,20 @@ if st.button(f"Load Holdings for {len(ciks)} CIKs", disabled=len(ciks)==0, key="
         )
 
     # Display results
-    st.success(f"✓ Successfully loaded {result['success_count']}/{result['total_ciks']} funds")
+    st.success(f"Successfully loaded {result['success_count']}/{result['total_ciks']} funds")
 
     if result['portfolios_created']:
-        st.info(f"📁 Created portfolios: {', '.join(result['portfolios_created'])}")
+        st.info(f"Created portfolios: {', '.join(result['portfolios_created'])}")
 
     if result['new_cusips'] > 0:
-        st.info(f"🔍 Discovered {result['new_cusips']} new securities")
+        st.info(f"Discovered {result['new_cusips']} new securities")
 
     if result['failed_ciks']:
-        st.warning(f"⚠ Failed CIKs: {', '.join(result['failed_ciks'])}")
+        st.warning(f"Failed CIKs: {', '.join(result['failed_ciks'])}")
 
     # Auto-fetch prices if checkbox was checked and new securities discovered
     if auto_fetch and result['new_cusips'] > 0:
-        st.info("🚀 Auto-fetching prices for new securities...")
+        st.info("Auto-fetching prices for new securities...")
         st.session_state.trigger_price_fetch = True
         st.rerun()
 
@@ -346,7 +346,7 @@ st.divider()
 # SECTION 3.5: FETCH SECURITY METADATA
 # ============================================================================
 
-st.subheader("📚 Fetch Security Metadata")
+st.subheader("Fetch Security Metadata")
 
 # Get metadata fetch status
 metadata_status = get_metadata_fetch_status()
@@ -363,7 +363,7 @@ if status_time:
         pass
 
 if metadata_status['running']:
-    st.info(f"🔄 Fetching metadata for {len(tickers)} securities (running in background)")
+    st.info(f"Fetching metadata for {len(tickers)} securities (running in background)")
 
     # Progress bar
     progress_value = metadata_status['current'] / metadata_status['total'] if metadata_status['total'] > 0 else 0
@@ -382,10 +382,10 @@ elif metadata_status.get('success_count', 0) > 0:
     success_count = metadata_status.get('success_count', 0)
     failed_count = len(metadata_status.get('failed_tickers', []))
 
-    st.success(f"✓ Completed: Fetched metadata for {success_count} securities")
+    st.success(f"Completed: Fetched metadata for {success_count} securities")
 
     if metadata_status.get('failed_tickers'):
-        with st.expander(f"⚠ {failed_count} Failed Tickers"):
+        with st.expander(f"{failed_count} Failed Tickers"):
             st.write(', '.join(metadata_status['failed_tickers']))
 
 else:
@@ -396,7 +396,7 @@ else:
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    if st.button("🔄 Fetch Metadata Now", key="fetch_metadata_manual", disabled=metadata_status['running']):
+    if st.button("Fetch Metadata Now", key="fetch_metadata_manual", disabled=metadata_status['running']):
         # Clear old status and start fresh
         save_metadata_fetch_status({
             'running': True,
@@ -416,12 +416,12 @@ with col1:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
-        st.toast("Metadata fetch started!", icon="🚀")
+        st.toast("Metadata fetch started!")
         time.sleep(0.5)
         st.rerun()
 
 with col2:
-    if st.button("🔄 Refresh Status", key="refresh_metadata_status", help="Clear completed status and reset to ready state"):
+    if st.button("Refresh Status", key="refresh_metadata_status", help="Clear completed status and reset to ready state"):
         # Clear completed status and reset to ready state
         save_metadata_fetch_status({
             'running': False,
@@ -433,7 +433,7 @@ with col2:
             'success_count': 0,
             'failed_tickers': []
         })
-        st.toast("Status cleared!", icon="✅")
+        st.toast("Status cleared!")
         time.sleep(0.3)
         st.rerun()
 
@@ -443,7 +443,7 @@ st.divider()
 # SECTION 4: PROCESS RAW DATA
 # ============================================================================
 
-st.subheader("⚙️ Process Raw Data")
+st.subheader("Process Raw Data")
 
 st.info("Consolidate raw data files into master tables")
 
@@ -457,10 +457,10 @@ if st.button("Consolidate Securities", key="consolidate_securities"):
         )
 
     if result.returncode == 0:
-        st.success("✓ Securities consolidation complete!")
+        st.success("Securities consolidation complete!")
         st.code(result.stdout)
     else:
-        st.error("✗ Securities consolidation failed")
+        st.error("Securities consolidation failed")
         st.code(result.stderr)
 
 if st.button("Consolidate Prices", key="consolidate_prices"):
@@ -473,12 +473,12 @@ if st.button("Consolidate Prices", key="consolidate_prices"):
         )
 
     if result.returncode == 0:
-        st.success("✓ Consolidation complete!")
+        st.success("Consolidation complete!")
         st.code(result.stdout)
     else:
-        st.error("✗ Consolidation failed")
+        st.error("Consolidation failed")
         st.code(result.stderr)
 
 # Footer
 st.divider()
-st.caption("💡 Tip: Smart Price Pull only fetches missing dates to save time and API calls")
+st.caption("Tip: Smart Price Pull only fetches missing dates to save time and API calls")

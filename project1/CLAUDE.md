@@ -121,9 +121,9 @@ Consolidated view of all securities with full metadata in Data Management page:
 1. Add new securities via "Add New Security" form (updates CUSIP cache)
 2. Click "Fetch Metadata Now" to get fundamental data for all securities
 3. Click "Consolidate Securities" to merge CUSIP + metadata into master table
-4. View complete data in "📋 Securities" expander
+4. View complete data in "Securities" expander
 
-**Location:** Data Management page → "📋 Securities" expander
+**Location:** Data Management page → "Securities" expander
 **Backend:** `utils/security_consolidation.py` + `scripts/consolidate_securities.py`
 **Data Flow:** `cusip_cache.csv` + `security_metadata.csv` → LEFT JOIN → `securities.csv`
 
@@ -131,7 +131,7 @@ Consolidated view of all securities with full metadata in Data Management page:
 Smart CUSIP/ticker resolution system in Data Management page:
 
 **How it works:**
-- **CUSIP → Ticker**: Auto-resolved via OpenFIGI API ✓
+- **CUSIP → Ticker**: Auto-resolved via OpenFIGI API
   - Primary use case: 13F filings provide CUSIPs
   - Works perfectly for adding securities from SEC filings
 - **Ticker → CUSIP**: Cache lookup only
@@ -146,7 +146,7 @@ Smart CUSIP/ticker resolution system in Data Management page:
 - For 13F filings workflow, we always have the CUSIP
 - Manual entry fallback allows flexibility for edge cases
 
-**Location:** `dashboard/pages/6_⚙️_Data_Management.py`
+**Location:** `dashboard/pages/6_Data_Management.py`
 **Backend:** `utils/security_operations.py`
 **Cache:** `data/raw/cusip_cache.csv` (162 entries)
 
@@ -154,7 +154,7 @@ Smart CUSIP/ticker resolution system in Data Management page:
 Background metadata fetching with real-time progress tracking in Data Management page:
 
 **How it works:**
-- Click "🔄 Fetch Metadata Now" button
+- Click "Fetch Metadata Now" button
 - Runs in background via `scripts/background_metadata_fetch.py`
 - Fetches 31 fundamental fields for all 162 securities from Yahoo Finance
 - Progress bar updates every 2 seconds
@@ -163,9 +163,9 @@ Background metadata fetching with real-time progress tracking in Data Management
 
 **After completion:**
 - Click "Consolidate Securities" to merge into master table
-- View results in "📋 Securities" expander
+- View results in "Securities" expander
 
-**Location:** Data Management page → "📚 Fetch Security Metadata" section
+**Location:** Data Management page → "Fetch Security Metadata" section
 **Backend:** `scripts/background_metadata_fetch.py` + `utils/metadata_operations.py`
 
 **31 Data Fields Fetched:**
@@ -218,7 +218,7 @@ pytest tests/ --cov=utils --cov=scrapers
   - Tests ticker→CUSIP cache lookup
   - Tests input validation and edge cases
   - Tests adding securities to cache
-  - All tests passing ✓
+  - All tests passing
 
 ### Requirements
 ```bash
@@ -233,9 +233,9 @@ pip install pytest pytest-cov
 - [ ] Historical position change visualization (QoQ analysis)
 - [ ] Multi-fund comparison view
 - [ ] More unit tests for scrapers and analysis modules
-- [x] ~~CUSIP-to-ticker mapping~~ (✓ Implemented via OpenFIGI API)
-- [x] ~~CSV-only storage migration~~ (✓ Complete - database removed)
-- [x] ~~Unit tests for security operations~~ (✓ 11 tests passing)
+- [x] ~~CUSIP-to-ticker mapping~~ (Implemented via OpenFIGI API)
+- [x] ~~CSV-only storage migration~~ (Complete - database removed)
+- [x] ~~Unit tests for security operations~~ (11 tests passing)
 
 ## User Preferences
 - Wants flexibility to add more funds later

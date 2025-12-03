@@ -49,21 +49,21 @@ Welcome to the Hedge Fund Portfolio Tracker dashboard. This application helps yo
 
 ### Features
 
-- **📊 Overview**: Portfolio summary with key metrics and top holdings
-- **📈 Positions**: Detailed holdings view with trade entry functionality
-- **💰 P&L Analysis**: Profit/loss analysis (coming soon)
-- **📉 Tracking Error**: Benchmark comparison and performance metrics (coming soon)
-- **📅 Calendar**: Historical filing dates and portfolio snapshots
-- **⚙️ Data Management**: Fetch and manage SEC filings and price data
+- **Overview**: Portfolio summary with key metrics and top holdings
+- **Positions**: Detailed holdings view with trade entry functionality
+- **P&L Analysis**: Profit/loss analysis (coming soon)
+- **Tracking Error**: Benchmark comparison and performance metrics (coming soon)
+- **Calendar**: Historical filing dates and portfolio snapshots
+- **Data Management**: Fetch and manage SEC filings and price data
 
 ### Getting Started
 
 Use the sidebar to navigate to different pages. If you're setting up for the first time:
 
-1. Go to **⚙️ Data Management** to initialize the database
+1. Go to **Data Management** to initialize the database
 2. Fetch SEC 13F filings for your target fund
 3. Process the raw filings to populate the database
-4. Explore the **📊 Overview** and **📈 Positions** pages to see your data
+4. Explore the **Overview** and **Positions** pages to see your data
 
 ### Current Focus
 

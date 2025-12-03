@@ -33,7 +33,7 @@ CACHE_EXPIRY_HOURS = 24  # How long to cache data before refreshing
 
 # Dashboard settings
 DASHBOARD_TITLE = "Hedge Fund Portfolio Tracker"
-DASHBOARD_PAGE_ICON = "📊"
+DASHBOARD_PAGE_ICON = "chart"
 
 # Default benchmark for tracking error
 DEFAULT_BENCHMARK = "XBI"  # SPDR S&P Biotech ETF (relevant for Baker Bros)
