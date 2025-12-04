@@ -11,8 +11,10 @@ from datetime import datetime
 # Paths
 DATA_DIR = Path(__file__).parent.parent / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
 HOLDINGS_DIR = RAW_DATA_DIR / "13f_filings"
 PRICES_DIR = RAW_DATA_DIR / "yahoo_prices"
+PROCESSED_HOLDINGS_FILE = PROCESSED_DATA_DIR / "holdings.csv"
 PORTFOLIOS_FILE = DATA_DIR / "portfolios.csv"
 STRATEGIES_FILE = DATA_DIR / "strategies.csv"
 TAGS_FILE = DATA_DIR / "tags.csv"
@@ -157,6 +159,35 @@ def load_holdings_by_date(portfolio_id: str, filing_date: str) -> pd.DataFrame:
         else:
             df['weight'] = 0.0
         df['value_millions'] = (df['value'] / 1_000_000).round(2)
+
+    return df
+
+
+def load_processed_holdings(portfolio_id: str, start_date: Optional[str] = None) -> pd.DataFrame:
+    """
+    Load consolidated daily holdings from processed/holdings.csv.
+
+    This function loads the daily holdings table that has been generated
+    by the consolidation script (scripts/consolidate_holdings.py).
+
+    Args:
+        portfolio_id: Portfolio ID to filter by
+        start_date: Optional start date (YYYY-MM-DD) to filter from
+
+    Returns:
+        DataFrame with columns: portfolio, ticker, cusip, shares, eod_date
+    """
+    if not PROCESSED_HOLDINGS_FILE.exists():
+        return pd.DataFrame()
+
+    df = pd.read_csv(PROCESSED_HOLDINGS_FILE)
+
+    # Filter by portfolio
+    df = df[df['portfolio'] == portfolio_id]
+
+    # Filter by start date if provided
+    if start_date:
+        df = df[df['eod_date'] >= start_date]
 
     return df
 

@@ -479,6 +479,22 @@ if st.button("Consolidate Prices", key="consolidate_prices"):
         st.error("Consolidation failed")
         st.code(result.stderr)
 
+if st.button("Consolidate Holdings", key="consolidate_holdings"):
+    with st.spinner("Processing quarterly 13F filings into daily holdings..."):
+        result = subprocess.run(
+            [sys.executable, "scripts/consolidate_holdings.py"],
+            cwd=project_root,
+            capture_output=True,
+            text=True
+        )
+
+    if result.returncode == 0:
+        st.success("Holdings consolidation complete!")
+        st.code(result.stdout)
+    else:
+        st.error("Holdings consolidation failed")
+        st.code(result.stderr)
+
 # Footer
 st.divider()
 st.caption("Tip: Smart Price Pull only fetches missing dates to save time and API calls")
