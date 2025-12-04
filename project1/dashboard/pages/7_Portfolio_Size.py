@@ -2,12 +2,13 @@
 Portfolio Size Analysis
 
 This page displays portfolio value over time by joining daily holdings with price data.
-Shows 2025 YTD total portfolio value and position breakdown.
+Shows total portfolio value and position breakdown for any selected date range.
 """
 
 import streamlit as st
 import sys
 from pathlib import Path
+from datetime import datetime, timedelta
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -42,33 +43,92 @@ if not holdings_file.exists():
     st.info("Go to Data Management page and click 'Consolidate Holdings to Daily Table'")
     st.stop()
 
+# Get available date range from holdings
+@st.cache_data
+def get_date_range(portfolio_id: str):
+    """Get min and max dates available in holdings."""
+    df = pd.read_csv(holdings_file)
+    df = df[df['portfolio'] == portfolio_id]
+    if df.empty:
+        return None, None
+    return df['eod_date'].min(), df['eod_date'].max()
+
+min_date_str, max_date_str = get_date_range(portfolio_id)
+
+if min_date_str is None:
+    st.error(f"No holdings data found for {selected_name}")
+    st.stop()
+
+min_date = pd.to_datetime(min_date_str).date()
+max_date = pd.to_datetime(max_date_str).date()
+
+# Date range selector
+st.markdown("---")
+col1, col2, col3 = st.columns([2, 1, 1])
+
+with col1:
+    # Preset options
+    today = datetime.now().date()
+    current_year_start = datetime(today.year, 1, 1).date()
+
+    preset_options = {
+        "Year to Date": (current_year_start, max_date),
+        "Last 3 Months": (max_date - timedelta(days=90), max_date),
+        "Last 6 Months": (max_date - timedelta(days=180), max_date),
+        "Last Year": (max_date - timedelta(days=365), max_date),
+        "All Time": (min_date, max_date),
+        "Custom": None
+    }
+
+    preset = st.selectbox("Date Range", list(preset_options.keys()), index=0)
+
+if preset == "Custom":
+    with col2:
+        start_date = st.date_input("Start Date", value=current_year_start, min_value=min_date, max_value=max_date)
+    with col3:
+        end_date = st.date_input("End Date", value=max_date, min_value=min_date, max_value=max_date)
+else:
+    start_date, end_date = preset_options[preset]
+    with col2:
+        st.date_input("Start Date", value=start_date, min_value=min_date, max_value=max_date, disabled=True)
+    with col3:
+        st.date_input("End Date", value=end_date, min_value=min_date, max_value=max_date, disabled=True)
+
+# Convert dates to strings
+start_date_str = start_date.strftime('%Y-%m-%d')
+end_date_str = end_date.strftime('%Y-%m-%d')
+
+# Validate date range
+if start_date > end_date:
+    st.error("Start date must be before end date")
+    st.stop()
+
+st.markdown("---")
+
 # Load and filter holdings
 @st.cache_data
-def load_holdings(portfolio_id: str, start_date: str):
+def load_holdings(portfolio_id: str, start_date: str, end_date: str):
     """Load holdings and filter to date range."""
     df = pd.read_csv(holdings_file)
     df = df[df['portfolio'] == portfolio_id]
-    df = df[df['eod_date'] >= start_date]
+    df = df[(df['eod_date'] >= start_date) & (df['eod_date'] <= end_date)]
     return df
 
 # Load and forward-fill prices
 @st.cache_data
-def load_prices(start_date: str):
+def load_prices(start_date: str, end_date: str):
     """Load and forward-fill prices."""
-    return get_forward_filled_prices(start_date=start_date)
-
-# Date range: 2025 YTD
-ytd_start = '2025-01-01'
+    return get_forward_filled_prices(start_date=start_date, end_date=end_date)
 
 with st.spinner("Loading holdings data..."):
-    holdings_df = load_holdings(portfolio_id, ytd_start)
+    holdings_df = load_holdings(portfolio_id, start_date_str, end_date_str)
 
 if holdings_df.empty:
-    st.warning(f"No holdings data found for {selected_name} in 2025 YTD.")
+    st.warning(f"No holdings data found for {selected_name} in selected date range.")
     st.stop()
 
 with st.spinner("Loading and forward-filling prices..."):
-    prices_df = load_prices(ytd_start)
+    prices_df = load_prices(start_date_str, end_date_str)
 
 with st.spinner("Calculating position values..."):
     portfolio_values = calculate_portfolio_values(holdings_df, prices_df)
@@ -100,7 +160,7 @@ with col3:
 st.markdown("---")
 
 # Chart 1: Total Portfolio Value Over Time
-st.subheader("Total Portfolio Value - 2025 YTD")
+st.subheader(f"Total Portfolio Value - {preset}")
 
 # Aggregate by date
 daily_totals = portfolio_values.groupby('eod_date')['position_value'].sum().reset_index()
@@ -127,7 +187,7 @@ fig1.update_traces(line_color='#1f77b4', line_width=2)
 st.plotly_chart(fig1, use_container_width=True)
 
 # Chart 2: Portfolio Composition by Position (Stacked Area)
-st.subheader("Portfolio Composition by Position - 2025 YTD")
+st.subheader(f"Portfolio Composition by Position - {preset}")
 
 # Get top 10 holdings by average value
 top_tickers = (
@@ -227,8 +287,16 @@ with col1:
     pct_change = ((last_value - first_value) / first_value * 100)
     dollar_change = last_value - first_value
 
+    # Dynamic label based on preset
+    if preset == "Year to Date":
+        perf_label = "YTD Performance"
+    elif preset == "Custom":
+        perf_label = "Period Performance"
+    else:
+        perf_label = f"{preset} Performance"
+
     st.metric(
-        "YTD Performance",
+        perf_label,
         f"{pct_change:+.2f}%",
         delta=f"${dollar_change:+,.0f}"
     )
@@ -250,9 +318,12 @@ if st.button("Export Portfolio Values to CSV"):
     # Convert to CSV
     csv = export_df.to_csv(index=False)
 
+    # Dynamic filename
+    date_suffix = f"{start_date_str}_to_{end_date_str}".replace('-', '')
+
     st.download_button(
         label="Download CSV",
         data=csv,
-        file_name=f"{portfolio_id}_portfolio_values_2025_ytd.csv",
+        file_name=f"{portfolio_id}_portfolio_values_{date_suffix}.csv",
         mime="text/csv"
     )
