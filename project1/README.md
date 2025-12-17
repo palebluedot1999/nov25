@@ -65,7 +65,7 @@ project1/
 │   ├── csv_data.py              # CSV data layer (replaces database)
 │   ├── data_processing.py       # Data transformations
 │   ├── price_operations.py      # Smart incremental price fetching with parallel processing
-│   ├── security_operations.py   # Security addition with OpenFIGI CUSIP/ticker lookup
+│   ├── security_operations.py   # Security addition with OpenFIGI lookup and one-click orchestration
 │   ├── metadata_operations.py   # Fetch and manage security fundamental data with background processing
 │   ├── security_consolidation.py # Merge CUSIP cache with metadata into master securities table
 │   └── fund_operations.py       # Batch CIK processing and portfolio creation
@@ -164,22 +164,36 @@ The dashboard will open in your browser at `http://localhost:8501`.
 4. **Tracking Error**: Benchmark comparison vs XBI
 5. **Calendar**: SEC filing calendar and history
 6. **Data Management**:
-   - Smart Price Pull: Background fetching with parallel processing and progress tracking
-   - Add New Security: Ticker/CUSIP resolution via OpenFIGI API with Securities view
-   - Add Fund Portfolio: Batch CIK processing with auto-name fetching
-   - Fetch Security Metadata: Background fetch of 31 fundamental fields with progress tracking
-   - Process Raw Data: Consolidate securities and price files into master tables
+   - **Add New Security**: One-click "Execute" button automatically fetches prices and metadata (~7-10 seconds)
+   - **View Securities**: Master table with all 162 securities and their 31 metadata fields
+   - **Bulk Operations** (Advanced): Background price/metadata fetching with parallel processing and progress tracking
+   - **Advanced Tools**: Batch CIK processing, fund portfolio management, data consolidation
 
 ### Fetching New Data
 
 From the **Data Management** page:
 
-1. **Smart Price Pull**: Automatically fetches missing price data for all 162 securities using parallel processing (10x faster). Runs in background with real-time progress tracking.
-2. **Add New Security**: Add securities by ticker or CUSIP. CUSIP→ticker auto-resolved via OpenFIGI API. View all securities in the Securities expander.
-3. **Add Fund Portfolio**: Batch add multiple funds by CIK with automatic SEC name lookup and holdings download.
-4. **Fetch Security Metadata**: Background fetch of 31 fundamental fields (sector, industry, financials) for all securities. Takes ~1-2 minutes with rate limiting.
-5. **Consolidate Securities**: Merge CUSIP cache with metadata into master `securities.csv` table (162 entries, 32 columns).
-6. **Consolidate Prices**: Merge individual ticker price files into master `prices.csv` table.
+#### One-Click Security Addition (Recommended)
+1. **Add New Security**:
+   - Enter ticker symbol (e.g., "MSFT") in the form
+   - Click **"Execute"** button
+   - Automatically fetches 5-year price history + 31 metadata fields (~7-10 seconds)
+   - Immediately visible in "View Securities" table below
+   - Shows detailed step-by-step results
+
+#### Bulk Operations (Advanced)
+Expand **"Bulk Operations (Advanced)"** section for batch processing:
+
+1. **Bulk Price Fetch**: Automatically fetches missing price data for all 162 securities using parallel processing (10x faster). Runs in background with real-time progress tracking.
+2. **Bulk Metadata Fetch**: Background fetch of 31 fundamental fields (sector, industry, financials) for all securities. Takes ~1-2 minutes with rate limiting.
+3. **Consolidate Securities**: Merge CUSIP cache with metadata into master `securities.csv` table (162 entries, 32 columns).
+4. **Consolidate Prices**: Merge individual ticker price files into master `prices.csv` table.
+5. **Consolidate Holdings**: Process quarterly 13F filings into daily holdings table.
+
+#### Advanced Tools
+Expand **"Advanced Tools"** section for batch fund management:
+
+1. **Add Fund Portfolio**: Batch add multiple funds by CIK with automatic SEC name lookup and holdings download.
 
 ### Manual Trade Entry
 

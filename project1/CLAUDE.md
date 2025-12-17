@@ -44,7 +44,7 @@ streamlit run dashboard/app.py
 - `utils/csv_data.py` - CSV data layer (replaces database)
 - `utils/data_processing.py` - Data transformation utilities
 - `utils/price_operations.py` - Smart incremental price fetching with parallel processing
-- `utils/security_operations.py` - Security addition with OpenFIGI CUSIP/ticker lookup
+- `utils/security_operations.py` - Security addition with OpenFIGI CUSIP/ticker lookup and one-click orchestration function
 - `utils/metadata_operations.py` - Fetch and manage security fundamental data with background processing
 - `utils/security_consolidation.py` - Merge CUSIP cache with metadata into master securities table
 - `utils/fund_operations.py` - Batch CIK processing and portfolio creation
@@ -104,60 +104,80 @@ data/
 - **Top 10 Holdings Weight Over Time** chart on Overview page
 - **Trade entry form** on Positions page (date, time, ticker, direction, quantity, price, cost, strategy)
 - Historical holdings view (20 quarters of Baker Bros data)
-- **Redesigned Data Management page** with 5 sections:
-  - Smart Price Pull: Background fetch with auto-run, progress tracking, and manual trigger
-  - Add New Security: Ticker/CUSIP resolution with Securities view (see details below)
-  - Add Fund Portfolio: Batch CIK processing with auto-name fetching from SEC
-  - Fetch Security Metadata: Background fetch of 31 fundamental fields with progress tracking
-  - Process Raw Data: Consolidate raw files into master tables (Securities + Prices + Holdings)
+- **Redesigned Data Management page** with 4 sections:
+  - **Add New Security**: One-click workflow - automatically fetches prices and metadata (see details below)
+  - **View Securities**: Master table with all 162 securities and their metadata in bordered container
+  - **Bulk Operations** (Advanced): Background price/metadata fetch, consolidation (collapsed by default)
+  - **Advanced Tools**: Batch CIK processing and fund portfolio management (collapsed by default)
 - **Portfolio Size Analysis page**: Real-time portfolio value tracking with daily granularity (2025 YTD)
 
-### Securities Master Table
-Consolidated view of all securities with full metadata in Data Management page:
+### View Securities Section
+Prominent display of all securities with full metadata in Data Management page:
 
 **What it is:**
 - Single master table combining CUSIP cache + security metadata
 - File: `data/processed/securities.csv`
 - 162 securities total (161 holdings + XBI benchmark)
 - 32 columns: CUSIP, ticker, company_name, sector, industry, + 27 metadata fields
+- **Displayed in bordered container box** for easy visibility
+- Shows "Number of Securities" metric at top
+- Column selector expander labeled "Columns" for customizing view
+- Export to CSV button included
 
-**How to update:**
-1. Add new securities via "Add New Security" form (updates CUSIP cache)
-2. Click "Fetch Metadata Now" to get fundamental data for all securities
-3. Click "Consolidate Securities" to merge CUSIP + metadata into master table
-4. View complete data in "Securities" expander
+**How to view:**
+- Navigate to Data Management page
+- "View Securities" section is always visible (not collapsed)
+- Default columns shown: ticker, company_name, sector, industry, market_cap, pe_ratio
+- Expand "Columns" to select additional columns from all 32 available
+- Click "Export Securities to CSV" to download full table
 
-**Location:** Data Management page → "Securities" expander
+**Location:** Data Management page → "View Securities" section (always visible)
 **Backend:** `utils/security_consolidation.py` + `scripts/consolidate_securities.py`
 **Data Flow:** `cusip_cache.csv` + `security_metadata.csv` → LEFT JOIN → `securities.csv`
 
 ### Add New Security Feature
-Smart CUSIP/ticker resolution system in Data Management page:
+**One-click workflow** for adding securities with automatic data fetching:
 
 **How it works:**
-- **CUSIP → Ticker**: Auto-resolved via OpenFIGI API
-  - Primary use case: 13F filings provide CUSIPs
-  - Works perfectly for adding securities from SEC filings
-- **Ticker → CUSIP**: Cache lookup only
-  - Checks `data/raw/cusip_cache.csv` first
-  - If not found, prompts for manual CUSIP entry
-  - Note: OpenFIGI and Yahoo Finance APIs don't provide CUSIP data (proprietary)
+1. Enter ticker symbol (e.g., "MSFT") or CUSIP in the form
+2. Click **"Execute"** button (primary blue button)
+3. **Automatically executes full pipeline** (~7-10 seconds):
+   - Resolves CUSIP ↔ Ticker via OpenFIGI API
+   - Fetches 5-year price history (2020-01-01 to present)
+   - Fetches 31 metadata fields from Yahoo Finance
+   - Consolidates into master securities table
+4. Shows detailed results with expandable step-by-step status
+5. **Immediately visible** in View Securities table below
+
+**UI Design:**
+- **Bordered container box** for clear visual separation
+- Caption: "Automatically fetch prices and metadata for a new security"
+- Two input fields: Ticker (required) and CUSIP (optional)
+- Single **"Execute"** button that runs entire workflow
+- Progress spinner during operation
+- Success/error messages with detailed step breakdown
+
+**Resolution Logic:**
+- **CUSIP → Ticker**: Auto-resolved via OpenFIGI API (primary use case for 13F filings)
+- **Ticker → CUSIP**: Cache lookup only (prompts for manual entry if not found)
 - **Both provided**: Added directly to cache
+- OpenFIGI and Yahoo Finance APIs don't provide CUSIP data (proprietary)
 
-**Why this approach:**
-- CUSIP data is proprietary (managed by CUSIP Global Services)
-- Free APIs (OpenFIGI, Yahoo Finance) don't return CUSIPs
-- For 13F filings workflow, we always have the CUSIP
-- Manual entry fallback allows flexibility for edge cases
+**Error Handling:**
+- Graceful partial failures (continues even if price/metadata fetch fails)
+- Shows what succeeded/failed with detailed error messages
+- Manual CUSIP entry prompt if ticker lookup fails
 
-**Location:** `dashboard/pages/6_Data_Management.py`
-**Backend:** `utils/security_operations.py`
+**Location:** Data Management page → "Add New Security" section (top, always visible)
+**Backend:** `utils/security_operations.py` → `add_security_with_full_data()`
 **Cache:** `data/raw/cusip_cache.csv` (162 entries)
+**Orchestration:** Chains `add_security_to_cache()` + `fetch_incremental_prices()` + `fetch_security_metadata()` + `consolidate_securities()`
 
-### Fetch Security Metadata Feature
-Background metadata fetching with real-time progress tracking in Data Management page:
+### Bulk Metadata Fetch Feature
+Background metadata fetching for all securities with real-time progress tracking:
 
 **How it works:**
+- Expand **"Bulk Operations (Advanced)"** section
 - Click "Fetch Metadata Now" button
 - Runs in background via `scripts/background_metadata_fetch.py`
 - Fetches 31 fundamental fields for all 162 securities from Yahoo Finance
@@ -167,9 +187,13 @@ Background metadata fetching with real-time progress tracking in Data Management
 
 **After completion:**
 - Click "Consolidate Securities" to merge into master table
-- View results in "Securities" expander
+- View results in "View Securities" section
 
-**Location:** Data Management page → "Fetch Security Metadata" section
+**Use case:**
+- Bulk updating metadata for all existing securities
+- For single security additions, use "Add New Security" one-click workflow instead
+
+**Location:** Data Management page → "Bulk Operations (Advanced)" → "Bulk Metadata Fetch"
 **Backend:** `scripts/background_metadata_fetch.py` + `utils/metadata_operations.py`
 
 **31 Data Fields Fetched:**
