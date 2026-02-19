@@ -21,8 +21,9 @@ from datetime import datetime, timedelta
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from utils.csv_data import load_portfolios, PORTFOLIOS_FILE
+from utils.csv_data import load_portfolios, get_holdings_files, PORTFOLIOS_FILE, RAW_DATA_DIR
 from scrapers.sec_edgar import SECEdgarScraper
+from utils.cusip_mapping import cusip_to_ticker
 from config.settings import SEC_USER_AGENT
 
 CUSIP_CACHE_FILE = project_root / "data" / "raw" / "cusip_cache.csv"
@@ -306,6 +307,114 @@ def batch_add_funds(ciks: List[str], start_date="2020-01-01",
         'failed_ciks': failed_ciks,
         'portfolios_created': portfolios_created,
         'new_cusips': new_cusips
+    }
+
+
+def fetch_incremental_filings_for_fund(portfolio_id: str, cik: str) -> Dict:
+    """
+    Fetch only new 13F filings for a fund (those not already saved locally).
+
+    Compares local filing dates against what SEC has available and downloads
+    only the filings whose filing_date is not already saved.
+
+    Args:
+        portfolio_id: Portfolio ID (used for filename pattern)
+        cik: CIK number
+
+    Returns:
+        Dict with keys:
+        - new_count: int (number of new filings downloaded)
+        - downloaded: List[str] (filing dates downloaded)
+        - errors: List[Dict] (any errors encountered)
+    """
+    # Get existing local filing dates
+    local_files = get_holdings_files(portfolio_id)
+    prefix = f"{portfolio_id}_"
+    suffix = "_holdings.csv"
+    local_dates = set()
+    for f in local_files:
+        name = f.name
+        if name.startswith(prefix) and name.endswith(suffix):
+            date_str = name[len(prefix):-len(suffix)]
+            local_dates.add(date_str)
+
+    # Get all available filings from SEC (metadata only — fast)
+    scraper = SECEdgarScraper()
+    sec_filings = scraper.get_13f_filings(cik, limit=None)
+
+    # Identify new filings
+    new_filings = [f for f in sec_filings if f['filing_date'] not in local_dates]
+
+    if not new_filings:
+        return {'new_count': 0, 'downloaded': [], 'errors': []}
+
+    # Download each new filing individually (same logic as fetch_and_save_filings)
+    holdings_dir = RAW_DATA_DIR / "13f_filings"
+    holdings_dir.mkdir(parents=True, exist_ok=True)
+
+    downloaded = []
+    errors = []
+
+    for filing in new_filings:
+        filing_date = filing['filing_date']
+        period_end = filing['report_date']
+        try:
+            holdings = scraper.get_13f_holdings(cik, filing['accession_number'])
+            if holdings:
+                for holding in holdings:
+                    cusip = holding.get('cusip')
+                    if cusip and not holding.get('ticker'):
+                        holding['ticker'] = cusip_to_ticker(cusip, holding.get('company_name'))
+                    holding['portfolio_id'] = portfolio_id
+                    holding['filing_date'] = filing_date
+                    holding['period_end_date'] = period_end
+
+                filename = f"{portfolio_id}_{filing_date}_holdings.csv"
+                pd.DataFrame(holdings).to_csv(holdings_dir / filename, index=False)
+                downloaded.append(filing_date)
+            else:
+                errors.append({'filing_date': filing_date, 'error': 'No holdings found'})
+        except Exception as e:
+            errors.append({'filing_date': filing_date, 'error': str(e)})
+
+    return {'new_count': len(downloaded), 'downloaded': downloaded, 'errors': errors}
+
+
+def pull_latest_13fs_all_funds() -> Dict:
+    """
+    Check SEC for new 13F filings for all tracked funds and download any not yet saved.
+
+    Returns:
+        Dict with keys:
+        - funds_checked: int
+        - total_new_filings: int
+        - details: List[Dict] (per-fund results including fund_name, portfolio_id, new_count, etc.)
+    """
+    portfolios_df = load_portfolios(portfolio_type='fund')
+
+    # Only process fund portfolios that have a CIK
+    fund_rows = portfolios_df[
+        portfolios_df['cik'].notna() & (portfolios_df['cik'].astype(str).str.strip() != '')
+    ]
+
+    results = []
+    total_new = 0
+
+    for _, row in fund_rows.iterrows():
+        portfolio_id = row['id']
+        cik = str(int(float(str(row['cik']).strip())))
+        fund_name = row['name']
+
+        result = fetch_incremental_filings_for_fund(portfolio_id, cik)
+        result['portfolio_id'] = portfolio_id
+        result['fund_name'] = fund_name
+        total_new += result['new_count']
+        results.append(result)
+
+    return {
+        'funds_checked': len(results),
+        'total_new_filings': total_new,
+        'details': results
     }
 
 
