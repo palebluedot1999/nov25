@@ -20,6 +20,7 @@ import time
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from utils.csv_data import load_portfolios
 from utils.price_operations import (
     get_all_cached_tickers,
     get_fetch_status,
@@ -480,6 +481,43 @@ with st.expander("Bulk Operations (Advanced)", expanded=False):
         else:
             st.error("Holdings consolidation failed")
             st.code(result.stderr)
+
+    st.markdown("---")
+
+    # ========================================================================
+    # SUBSECTION 3.4: COMPUTE QoQ CHANGES
+    # ========================================================================
+
+    st.markdown("### Compute QoQ Changes")
+    st.caption(
+        "Pre-compute quarter-over-quarter Δ% and weight Δ (basis points) for all filing pairs. "
+        "Saves to data/processed/qoq_changes.csv. Fund Tracking reads from this file automatically."
+    )
+
+    _fund_portfolios_dm = load_portfolios(portfolio_type="fund")
+    _fund_portfolios_dm = _fund_portfolios_dm[
+        _fund_portfolios_dm["cik"].notna()
+        & (_fund_portfolios_dm["cik"].astype(str).str.strip() != "")
+    ]
+
+    if _fund_portfolios_dm.empty:
+        st.info("No funds tracked yet. Add a fund on the Fund Tracking page first.")
+    else:
+        for _, _fund_row in _fund_portfolios_dm.iterrows():
+            if st.button(
+                f"Compute QoQ — {_fund_row['name']}",
+                key=f"qoq_{_fund_row['id']}",
+            ):
+                from utils.data_processing import compute_and_save_qoq_changes
+                with st.spinner(f"Computing for {_fund_row['name']}…"):
+                    _result_df = compute_and_save_qoq_changes(_fund_row["id"])
+                if _result_df.empty:
+                    st.warning("Need at least 2 filings.")
+                else:
+                    st.success(
+                        f"Saved {len(_result_df):,} rows across "
+                        f"{_result_df['filing_date'].nunique()} periods to qoq_changes.csv."
+                    )
 
 st.divider()
 

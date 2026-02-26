@@ -164,6 +164,138 @@ def get_top_holdings_over_time(portfolio_id: str, top_n: int = 10) -> pd.DataFra
     return result_df
 
 
+def compute_and_save_qoq_changes(portfolio_id: str) -> pd.DataFrame:
+    """
+    Compute quarter-over-quarter changes for all filing pairs and save to
+    data/processed/qoq_changes.csv.
+
+    For each consecutive filing pair the function calculates per-position:
+      - shares_delta_pct   : percent change in shares held
+      - value_delta_pct    : percent change in 13F-reported value
+      - qoq_weight_delta   : change in portfolio weight (percentage points, 13F-based)
+
+    The CSV is keyed on (portfolio_id, filing_date, cusip) so re-running this
+    function safely overwrites old rows for the same fund while preserving rows
+    for other funds.
+
+    Args:
+        portfolio_id: Portfolio identifier (e.g. 'baker-bros')
+
+    Returns:
+        DataFrame of all computed QoQ rows for this portfolio
+    """
+    from utils.csv_data import get_holdings_files, load_holdings_by_date, PROCESSED_DATA_DIR
+
+    files = get_holdings_files(portfolio_id)  # newest-first
+    if len(files) < 2:
+        return pd.DataFrame()
+
+    # Build ordered list of filing dates oldest → newest
+    def _extract_date(path):
+        parts = path.stem.split("_")
+        return parts[1] if len(parts) >= 2 else "1970-01-01"
+
+    ordered_dates = sorted([_extract_date(f) for f in files])  # ascending
+
+    rows = []
+    for i in range(1, len(ordered_dates)):
+        prior_date = ordered_dates[i - 1]
+        curr_date = ordered_dates[i]
+
+        curr_df = load_holdings_by_date(portfolio_id, curr_date)
+        prior_df = load_holdings_by_date(portfolio_id, prior_date)
+
+        if curr_df.empty or prior_df.empty:
+            continue
+
+        curr_total = curr_df["value"].sum()
+        prior_total = prior_df["value"].sum()
+
+        if curr_total == 0 or prior_total == 0:
+            continue
+
+        # Compute per-position weights from 13F values
+        curr_df = curr_df.copy()
+        curr_df["weight_13f"] = (curr_df["value"] / curr_total * 100).round(4)
+
+        prior_subset = prior_df[["cusip", "shares", "value"]].rename(
+            columns={"shares": "prior_shares", "value": "prior_value"}
+        )
+        prior_subset["prior_weight_13f"] = (
+            prior_subset["prior_value"] / prior_total * 100
+        ).round(4)
+
+        merged = curr_df.merge(prior_subset, on="cusip", how="left")
+
+        period_end = curr_df["period_end_date"].iloc[0]
+
+        for _, row in merged.iterrows():
+            prior_shares = row.get("prior_shares")
+            prior_value = row.get("prior_value")
+            prior_weight = row.get("prior_weight_13f")
+
+            has_prior = pd.notna(prior_shares)
+
+            if has_prior and prior_shares != 0:
+                shares_delta_pct = round(
+                    (row["shares"] - prior_shares) / prior_shares * 100, 2
+                )
+            else:
+                shares_delta_pct = None
+
+            if has_prior and prior_value != 0:
+                value_delta_pct = round(
+                    (row["value"] - prior_value) / prior_value * 100, 2
+                )
+            else:
+                value_delta_pct = None
+
+            if has_prior and pd.notna(prior_weight):
+                qoq_weight_delta = round(row["weight_13f"] - prior_weight, 4)
+            else:
+                qoq_weight_delta = None
+
+            rows.append({
+                "portfolio_id": portfolio_id,
+                "filing_date": curr_date,
+                "prior_filing_date": prior_date,
+                "period_end_date": period_end,
+                "cusip": row["cusip"],
+                "ticker": row.get("ticker", ""),
+                "company_name": row.get("company_name", ""),
+                "shares": row["shares"],
+                "prior_shares": prior_shares if has_prior else None,
+                "shares_delta": (row["shares"] - prior_shares) if has_prior else None,
+                "shares_delta_pct": shares_delta_pct,
+                "value": row["value"],
+                "prior_value": prior_value if has_prior else None,
+                "value_delta_pct": value_delta_pct,
+                "weight_13f": row["weight_13f"],
+                "prior_weight_13f": prior_weight if has_prior else None,
+                "qoq_weight_delta": qoq_weight_delta,
+                "is_new": not has_prior,
+            })
+
+    if not rows:
+        return pd.DataFrame()
+
+    result_df = pd.DataFrame(rows)
+
+    # Merge into existing qoq_changes.csv (keep other portfolios, overwrite this one)
+    qoq_path = PROCESSED_DATA_DIR / "qoq_changes.csv"
+    if qoq_path.exists():
+        existing = pd.read_csv(qoq_path)
+        existing = existing[existing["portfolio_id"] != portfolio_id]
+        combined = pd.concat([existing, result_df], ignore_index=True)
+    else:
+        combined = result_df
+
+    PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(qoq_path, index=False)
+
+    return result_df
+
+
 if __name__ == "__main__":
     # Test CSV data functions
     print("Testing CSV data functions...")

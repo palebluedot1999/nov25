@@ -13,10 +13,12 @@ A Python-based dashboard for tracking and analyzing hedge fund portfolios using 
 - **Analysis Tools**:
   - Portfolio positions and concentration metrics
   - Top 10 holdings weight over time visualization
+  - **QoQ Analytics**: Shares Δ%, Value Δ%, Weight Δ in basis points — auto-computed on first load
   - P&L calculations
   - Tracking error vs benchmark
   - Filing calendar with 5-year historical data
   - Manual trade entry and tracking
+- **Portfolio Size Analysis**: Daily portfolio value tracking (118K+ records, 4-6% accuracy vs 13F)
 
 ## Project Structure
 
@@ -41,7 +43,9 @@ project1/
 │   │   └── yahoo_prices/        # Yahoo Finance price data (one CSV per ticker)
 │   └── processed/               # Processed/consolidated data
 │       ├── prices.csv           # Master price table (188K+ records, 162 tickers)
-│       └── securities.csv       # Master securities table (162 entries, CUSIP + metadata)
+│       ├── securities.csv       # Master securities table (162 entries, CUSIP + metadata)
+│       ├── holdings.csv         # Daily holdings (118K+ records, 2020-present)
+│       └── qoq_changes.csv      # Pre-computed QoQ Δ% and weight Δ (bp) for all filing pairs
 ├── scripts/                      # Initialization and backfill scripts
 │   ├── initialize_csv_files.py  # Create CSV data files
 │   ├── backfill_historical_holdings.py # Fetch historical 13F filings
@@ -55,15 +59,17 @@ project1/
 │   ├── app.py                   # Main dashboard app
 │   ├── pages/                   # Dashboard pages
 │   │   ├── 1_Overview.py        # Portfolio summary with top holdings chart
-│   │   ├── 2_Positions.py       # Current holdings with trade entry form
+│   │   ├── 2_Fund_Tracking.py   # 13F holdings viewer with QoQ analytics (auto-computes on load)
 │   │   ├── 3_PnL_Analysis.py
 │   │   ├── 4_Tracking_Error.py
 │   │   ├── 5_Calendar.py
-│   │   └── 6_Data_Management.py # Smart price pull, security addition, fund batch processing
+│   │   ├── 6_Data_Management.py # Security addition, bulk ops, Compute QoQ Changes
+│   │   ├── 7_Portfolio_Size.py  # Daily portfolio value tracking and position breakdown
+│   │   └── 8_Prices.py          # Price data management and charts
 │   └── components/              # Reusable UI components
 ├── utils/                        # Utilities
-│   ├── csv_data.py              # CSV data layer (replaces database)
-│   ├── data_processing.py       # Data transformations
+│   ├── csv_data.py              # CSV data layer (replaces database) + load_qoq_changes()
+│   ├── data_processing.py       # Data transformations + compute_and_save_qoq_changes()
 │   ├── price_operations.py      # Smart incremental price fetching with parallel processing
 │   ├── security_operations.py   # Security addition with OpenFIGI lookup and one-click orchestration
 │   ├── metadata_operations.py   # Fetch and manage security fundamental data with background processing
@@ -159,15 +165,17 @@ The dashboard will open in your browser at `http://localhost:8501`.
 ### Dashboard Pages
 
 1. **Overview**: Portfolio summary, key metrics, and top 10 holdings weight over time chart
-2. **Positions**: Current holdings with manual trade entry form
-3. **P&L Analysis**: Performance calculations
-4. **Tracking Error**: Benchmark comparison vs XBI
+2. **Fund Tracking**: 13F holdings viewer with QoQ analytics — Shares Δ%, Value Δ%, Weight Δ (bp) auto-computed on first load; navigate between quarters; pull latest 13F filings; add new funds by CIK
+3. **P&L Analysis**: Performance calculations (placeholder)
+4. **Tracking Error**: Benchmark comparison vs XBI (placeholder)
 5. **Calendar**: SEC filing calendar and history
 6. **Data Management**:
-   - **Add New Security**: One-click "Execute" button automatically fetches prices and metadata (~7-10 seconds)
+   - **Add New Security**: One-click "Execute" — fetches prices and metadata automatically (~7-10 seconds)
    - **View Securities**: Master table with all 162 securities and their 31 metadata fields
-   - **Bulk Operations** (Advanced): Background price/metadata fetching with parallel processing and progress tracking
-   - **Advanced Tools**: Batch CIK processing, fund portfolio management, data consolidation
+   - **Bulk Operations** (Advanced): Background price/metadata fetching, consolidation scripts, and **Compute QoQ Changes** per fund
+   - **Advanced Tools**: Batch CIK processing, fund portfolio management
+7. **Portfolio Size Analysis**: Daily portfolio value tracking (2025 YTD), stacked position breakdown chart, accuracy within 4-6% of official 13F values
+8. **Prices**: Price data management and interactive charts per ticker
 
 ### Fetching New Data
 
@@ -189,6 +197,7 @@ Expand **"Bulk Operations (Advanced)"** section for batch processing:
 3. **Consolidate Securities**: Merge CUSIP cache with metadata into master `securities.csv` table (162 entries, 32 columns).
 4. **Consolidate Prices**: Merge individual ticker price files into master `prices.csv` table.
 5. **Consolidate Holdings**: Process quarterly 13F filings into daily holdings table.
+6. **Compute QoQ Changes**: Pre-compute Shares Δ%, Value Δ%, and Weight Δ (basis points) for all filing pairs per fund. Saves to `data/processed/qoq_changes.csv`. Fund Tracking auto-triggers this on first load.
 
 #### Advanced Tools
 Expand **"Advanced Tools"** section for batch fund management:
@@ -344,7 +353,7 @@ Current test coverage:
 - [ ] Implement P&L and tracking error analysis (currently placeholders in dashboard)
 - [ ] Add Whale Wisdom scraper
 - [ ] Add DataRoma scraper
-- [ ] Historical position change visualization (QoQ analysis)
+- [x] ~~Historical position change visualization (QoQ analysis)~~ (Shares Δ%, Value Δ%, Weight Δ bp on Fund Tracking page)
 - [ ] Multi-fund comparison view
 - [ ] More interactive Plotly charts
 - [ ] More unit tests for scrapers and analysis modules
