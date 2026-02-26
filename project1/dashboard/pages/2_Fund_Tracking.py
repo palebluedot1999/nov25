@@ -152,8 +152,13 @@ if selected_portfolio and selected_filing_date:
         prior_filing_date = get_prior_filing_date(filings_df, selected_filing_date)
         is_first_filing = prior_filing_date is None
 
-        # Load pre-computed QoQ table (shares %, value %, weight delta)
+        # Load pre-computed QoQ table; auto-compute silently if missing
         qoq_df = load_qoq_changes(portfolio_id, selected_filing_date)
+        if not is_first_filing and qoq_df.empty:
+            from utils.data_processing import compute_and_save_qoq_changes
+            with st.spinner("Computing QoQ changes…"):
+                compute_and_save_qoq_changes(portfolio_id)
+            qoq_df = load_qoq_changes(portfolio_id, selected_filing_date)
         has_qoq_table = not qoq_df.empty
 
         if not is_first_filing:
@@ -195,17 +200,11 @@ if selected_portfolio and selected_filing_date:
             else 0.0
         )
 
-        # Prior weight per position (based on 13F-reported values from prior filing)
-        if prior_total_value > 0:
-            merged["prior_weight"] = (merged["prior_value"] / prior_total_value * 100).round(2)
-        else:
-            merged["prior_weight"] = None
-
         # Sort by display value descending and add rank
         merged = merged.sort_values("display_value", ascending=False).reset_index(drop=True)
         merged["rank"] = merged.index + 1
 
-        # --- QoQ absolute deltas (computed inline from raw filings) ---
+        # --- QoQ absolute deltas (for CSV export) ---
         def fmt_qoq_shares(row):
             if is_first_filing:
                 return "—"
@@ -220,12 +219,12 @@ if selected_portfolio and selected_filing_date:
             if pd.isna(row.get("prior_value")):
                 return "NEW"
             delta = (row["display_value"] - row["prior_value"]) / 1_000_000
-            return f"${delta:+.2f}M"
+            return f"${delta:+,.2f}M"
 
         merged["QoQ Shares Δ"] = merged.apply(fmt_qoq_shares, axis=1)
         merged["QoQ Value Δ"] = merged.apply(fmt_qoq_value, axis=1)
 
-        # --- QoQ percent / weight columns (from pre-computed table, if available) ---
+        # --- QoQ percent / weight columns (from pre-computed table) ---
         if has_qoq_table:
             qoq_lookup = qoq_df.set_index("cusip")
 
@@ -236,7 +235,7 @@ if selected_portfolio and selected_filing_date:
                 val = qoq_lookup.loc[cusip, "shares_delta_pct"]
                 if pd.isna(val):
                     return "N/A"
-                return f"{val:+.1f}%"
+                return f"{val:+.2f}%"
 
             def _lookup_value_pct(row):
                 cusip = row["cusip"]
@@ -245,7 +244,7 @@ if selected_portfolio and selected_filing_date:
                 val = qoq_lookup.loc[cusip, "value_delta_pct"]
                 if pd.isna(val):
                     return "N/A"
-                return f"{val:+.1f}%"
+                return f"{val:+.2f}%"
 
             def _lookup_weight_delta(row):
                 cusip = row["cusip"]
@@ -254,34 +253,38 @@ if selected_portfolio and selected_filing_date:
                 val = qoq_lookup.loc[cusip, "qoq_weight_delta"]
                 if pd.isna(val):
                     return "N/A"
-                return f"{val:+.2f}pp"
+                bps = int(round(val * 100))
+                return f"{bps:+d}bp"
 
             merged["QoQ Shares Δ%"] = merged.apply(_lookup_shares_pct, axis=1)
             merged["QoQ Value Δ%"] = merged.apply(_lookup_value_pct, axis=1)
             merged["QoQ Weight Δ"] = merged.apply(_lookup_weight_delta, axis=1)
         else:
-            merged["QoQ Shares Δ%"] = "—" if is_first_filing else "compute →"
-            merged["QoQ Value Δ%"] = "—" if is_first_filing else "compute →"
-            merged["QoQ Weight Δ"] = "—" if is_first_filing else "compute →"
+            merged["QoQ Shares Δ%"] = "—"
+            merged["QoQ Value Δ%"] = "—"
+            merged["QoQ Weight Δ"] = "—"
 
-        # --- Build display DataFrame ---
+        # --- Build display DataFrame (3 QoQ columns shown) ---
         display_df = pd.DataFrame({
-            "Rank": merged["rank"],
-            "Company": merged["company_name"],
-            "Ticker": merged["ticker"].fillna(""),
-            "CUSIP": merged["cusip"].fillna(""),
-            "Shares": merged["shares"].apply(lambda x: f"{x:,.0f}"),
-            "Latest Price": merged["latest_price"].apply(
-                lambda x: f"${x:.2f}" if pd.notna(x) else "N/A"
-            ),
-            "Value ($M)": (merged["display_value"] / 1_000_000).round(2),
-            "Weight (%)": merged["display_weight"],
-            "QoQ Shares Δ": merged["QoQ Shares Δ"],
+            "Rank":          merged["rank"],
+            "Company":       merged["company_name"],
+            "Ticker":        merged["ticker"].fillna(""),
+            "CUSIP":         merged["cusip"].fillna(""),
+            "Shares":        merged["shares"].apply(lambda x: f"{x:,.0f}"),
+            "Price":         merged["latest_price"].apply(
+                                 lambda x: f"${x:,.2f}" if pd.notna(x) else "N/A"
+                             ),
+            "Value ($M)":    (merged["display_value"] / 1_000_000).round(2),
+            "Weight (%)":    merged["display_weight"],
             "QoQ Shares Δ%": merged["QoQ Shares Δ%"],
-            "QoQ Value Δ": merged["QoQ Value Δ"],
-            "QoQ Value Δ%": merged["QoQ Value Δ%"],
-            "QoQ Weight Δ": merged["QoQ Weight Δ"],
+            "QoQ Value Δ%":  merged["QoQ Value Δ%"],
+            "QoQ Weight Δ":  merged["QoQ Weight Δ"],
         })
+
+        # CSV export includes absolute deltas too
+        export_df = display_df.copy()
+        export_df.insert(display_df.columns.get_loc("QoQ Shares Δ%"), "QoQ Shares Δ", merged["QoQ Shares Δ"])
+        export_df.insert(display_df.columns.get_loc("QoQ Value Δ%") + 1, "QoQ Value Δ", merged["QoQ Value Δ"])
 
         # --- Render ---
         with st.container(border=True):
@@ -289,7 +292,7 @@ if selected_portfolio and selected_filing_date:
             m1, m2, m3, m4 = st.columns(4)
             with m1:
                 val_b = total_display_value / 1_000_000_000
-                st.metric("Total Value", f"${val_b:.2f}B")
+                st.metric("Total Value", f"${val_b:,.2f}B")
             with m2:
                 st.metric("Positions", len(merged))
             with m3:
@@ -301,49 +304,22 @@ if selected_portfolio and selected_filing_date:
                 st.info("First available filing — no QoQ comparison available.")
             elif not has_qoq_table:
                 st.info(
-                    "QoQ % columns not yet computed. "
-                    "Use **Compute QoQ Changes** below to generate them."
+                    "QoQ data unavailable for this period — run "
+                    "**Compute QoQ Changes** in Data Management."
                 )
 
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-            csv_bytes = display_df.to_csv(index=False).encode("utf-8")
+            csv_bytes = export_df.to_csv(index=False).encode("utf-8")
             st.download_button(
                 "Export to CSV",
                 data=csv_bytes,
-                file_name=f"{portfolio_id}_{selected_filing_date}_holdings_display.csv",
+                file_name=f"{portfolio_id}_{selected_filing_date}_holdings.csv",
                 mime="text/csv",
             )
 
 # ============================================================================
-# SECTION C: COMPUTE QoQ CHANGES
-# ============================================================================
-
-with st.expander("Compute QoQ Changes", expanded=False):
-    st.caption(
-        "Pre-compute quarter-over-quarter percent changes (shares Δ%, value Δ%, weight Δ) "
-        "for all filing pairs and save to data/processed/qoq_changes.csv."
-    )
-
-    if selected_portfolio:
-        if st.button("Compute QoQ Changes", type="primary", key="compute_qoq"):
-            from utils.data_processing import compute_and_save_qoq_changes
-            with st.spinner(f"Computing QoQ changes for {selected_fund_name}..."):
-                result_df = compute_and_save_qoq_changes(portfolio_id)
-            if result_df.empty:
-                st.warning("No QoQ data computed — need at least 2 filings.")
-            else:
-                filing_count = result_df["filing_date"].nunique()
-                st.success(
-                    f"Saved {len(result_df):,} rows across {filing_count} filing periods "
-                    f"to qoq_changes.csv."
-                )
-            st.rerun()
-    else:
-        st.info("Select a fund above first.")
-
-# ============================================================================
-# SECTION D: PULL LATEST 13Fs
+# SECTION C: PULL LATEST 13Fs
 # ============================================================================
 
 with st.expander("Pull Latest 13Fs", expanded=False):
@@ -379,6 +355,7 @@ with st.expander("Pull Latest 13Fs", expanded=False):
 # ============================================================================
 # SECTION D: ADD NEW FUND
 # ============================================================================
+
 
 with st.expander("Add New Fund", expanded=False):
     st.caption(
