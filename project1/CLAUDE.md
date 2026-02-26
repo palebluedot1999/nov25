@@ -82,7 +82,8 @@ data/
 └── processed/                  # Processed/consolidated data
     ├── prices.csv              # Master price table (188K+ records, 162 tickers)
     ├── securities.csv          # Master securities table (162 entries, CUSIP + ticker + 31 metadata fields)
-    └── holdings.csv            # Daily holdings table (118K+ records, 155 tickers, 2020-12-31 to present)
+    ├── holdings.csv            # Daily holdings table (118K+ records, 155 tickers, 2020-12-31 to present)
+    └── qoq_changes.csv         # Pre-computed QoQ changes for all filing pairs (shares Δ%, value Δ%, weight Δ bp)
 ```
 
 ## Design Decisions
@@ -107,9 +108,10 @@ data/
 - **Redesigned Data Management page** with 4 sections:
   - **Add New Security**: One-click workflow - automatically fetches prices and metadata (see details below)
   - **View Securities**: Master table with all 162 securities and their metadata in bordered container
-  - **Bulk Operations** (Advanced): Background price/metadata fetch, consolidation (collapsed by default)
+  - **Bulk Operations** (Advanced): Background price/metadata fetch, consolidation, **Compute QoQ Changes** per fund (collapsed by default)
   - **Advanced Tools**: Batch CIK processing and fund portfolio management (collapsed by default)
 - **Portfolio Size Analysis page**: Real-time portfolio value tracking with daily granularity (2025 YTD)
+- **QoQ Analytics on Fund Tracking page**: Shares Δ%, Value Δ%, Weight Δ (basis points) auto-computed on first load and cached in `qoq_changes.csv`
 
 ### View Securities Section
 Prominent display of all securities with full metadata in Data Management page:
@@ -223,6 +225,37 @@ Background metadata fetching for all securities with real-time progress tracking
 
 **Current coverage:** 160 securities with metadata, 2 without (newly added CUSIPs)
 **Sector breakdown:** Predominantly Healthcare/Biotechnology sector
+
+### QoQ Analytics on Fund Tracking Page
+Quarter-over-quarter change metrics on the Fund Tracking holdings table.
+
+**Columns shown (adjacent to the column they describe):**
+- **Shares → QoQ Shares Δ%**: Percent change in shares held vs prior quarter (e.g. `+12.34%`)
+- **Value ($M) → QoQ Value Δ%**: Percent change in 13F-reported value vs prior quarter
+- **Weight (%) → QoQ Weight Δ**: Weight change in **basis points** (e.g. `+125bp`), per Bloomberg/FactSet convention
+
+**Behaviour:**
+- Auto-computed on Fund Tracking page load if `qoq_changes.csv` is missing/stale for the selected period (runs ~2s spinner, then instant on reload)
+- "NEW" shown for positions not present in prior quarter
+- "—" shown for the earliest available filing (no prior quarter)
+- CSV export also includes absolute deltas (`QoQ Shares Δ`, `QoQ Value Δ`)
+
+**Manual re-computation:**
+- Data Management → Bulk Operations (Advanced) → "Compute QoQ Changes" (per-fund button)
+
+**Key files:**
+- **Data**: `data/processed/qoq_changes.csv` — columns: portfolio_id, filing_date, prior_filing_date, period_end_date, cusip, ticker, shares, prior_shares, shares_delta, shares_delta_pct, value, prior_value, value_delta_pct, weight_13f, prior_weight_13f, qoq_weight_delta, is_new
+- **Compute**: `utils/data_processing.py` → `compute_and_save_qoq_changes(portfolio_id)`
+- **Load**: `utils/csv_data.py` → `load_qoq_changes(portfolio_id, filing_date)`
+- **Dashboard**: `dashboard/pages/2_Fund_Tracking.py`
+
+**Number formatting conventions (Bloomberg-style):**
+- Shares: comma-separated integers (`27,525,640`)
+- Price: `$45.23` with commas for large values
+- Value: 2 decimal places in $M (`138.45`)
+- Weight: 2 decimal places in % (`5.23`)
+- Δ%: always 2 decimal places with sign (`+12.34%`)
+- Weight Δ: integer basis points with sign (`+125bp`)
 
 ### Portfolio Size Analysis
 Accurate portfolio value tracking by joining daily holdings with price data in a new Streamlit page.
@@ -376,7 +409,7 @@ pip install pytest pytest-cov
 - [ ] Add Whale Wisdom scraper
 - [ ] Add DataRoma scraper
 - [ ] Add more interactive Plotly charts
-- [ ] Historical position change visualization (QoQ analysis)
+- [x] ~~Historical position change visualization (QoQ analysis)~~ (Complete - Shares Δ%, Value Δ%, Weight Δ bp on Fund Tracking page)
 - [ ] Multi-fund comparison view
 - [ ] Date range selector for Portfolio Size page (currently hardcoded to 2025 YTD)
 - [ ] Intraday holdings tracking (merge 13F filings + manual transactions)

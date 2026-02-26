@@ -264,27 +264,43 @@ if selected_portfolio and selected_filing_date:
             merged["QoQ Value Δ%"] = "—"
             merged["QoQ Weight Δ"] = "—"
 
-        # --- Build display DataFrame (3 QoQ columns shown) ---
+        # --- Build display DataFrame ---
+        # QoQ delta columns are placed immediately after the column they describe:
+        #   Shares → QoQ Shares Δ%,  Value → QoQ Value Δ%,  Weight → QoQ Weight Δ
         display_df = pd.DataFrame({
             "Rank":          merged["rank"],
             "Company":       merged["company_name"],
             "Ticker":        merged["ticker"].fillna(""),
             "CUSIP":         merged["cusip"].fillna(""),
             "Shares":        merged["shares"].apply(lambda x: f"{x:,.0f}"),
+            "QoQ Shares Δ%": merged["QoQ Shares Δ%"],
             "Price":         merged["latest_price"].apply(
                                  lambda x: f"${x:,.2f}" if pd.notna(x) else "N/A"
                              ),
             "Value ($M)":    (merged["display_value"] / 1_000_000).round(2),
-            "Weight (%)":    merged["display_weight"],
-            "QoQ Shares Δ%": merged["QoQ Shares Δ%"],
             "QoQ Value Δ%":  merged["QoQ Value Δ%"],
+            "Weight (%)":    merged["display_weight"],
             "QoQ Weight Δ":  merged["QoQ Weight Δ"],
         })
 
-        # CSV export includes absolute deltas too
-        export_df = display_df.copy()
-        export_df.insert(display_df.columns.get_loc("QoQ Shares Δ%"), "QoQ Shares Δ", merged["QoQ Shares Δ"])
-        export_df.insert(display_df.columns.get_loc("QoQ Value Δ%") + 1, "QoQ Value Δ", merged["QoQ Value Δ"])
+        # CSV export adds absolute delta columns alongside their percent counterparts
+        export_df = pd.DataFrame({
+            "Rank":          merged["rank"],
+            "Company":       merged["company_name"],
+            "Ticker":        merged["ticker"].fillna(""),
+            "CUSIP":         merged["cusip"].fillna(""),
+            "Shares":        merged["shares"].apply(lambda x: f"{x:,.0f}"),
+            "QoQ Shares Δ":  merged["QoQ Shares Δ"],
+            "QoQ Shares Δ%": merged["QoQ Shares Δ%"],
+            "Price":         merged["latest_price"].apply(
+                                 lambda x: f"${x:,.2f}" if pd.notna(x) else "N/A"
+                             ),
+            "Value ($M)":    (merged["display_value"] / 1_000_000).round(2),
+            "QoQ Value Δ":   merged["QoQ Value Δ"],
+            "QoQ Value Δ%":  merged["QoQ Value Δ%"],
+            "Weight (%)":    merged["display_weight"],
+            "QoQ Weight Δ":  merged["QoQ Weight Δ"],
+        })
 
         # --- Render ---
         with st.container(border=True):
