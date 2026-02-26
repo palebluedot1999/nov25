@@ -163,6 +163,27 @@ def load_holdings_by_date(portfolio_id: str, filing_date: str) -> pd.DataFrame:
     return df
 
 
+def load_qoq_changes(portfolio_id: str, filing_date: Optional[str] = None) -> pd.DataFrame:
+    """
+    Load pre-computed QoQ changes from processed/qoq_changes.csv.
+
+    Args:
+        portfolio_id: Portfolio ID to filter by
+        filing_date: Optional filing date (YYYY-MM-DD) to filter to a single period
+
+    Returns:
+        DataFrame with QoQ metrics (empty if file not found or no data)
+    """
+    qoq_path = PROCESSED_DATA_DIR / "qoq_changes.csv"
+    if not qoq_path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(qoq_path)
+    df = df[df["portfolio_id"] == portfolio_id]
+    if filing_date:
+        df = df[df["filing_date"] == filing_date]
+    return df.reset_index(drop=True)
+
+
 def load_processed_holdings(portfolio_id: str, start_date: Optional[str] = None) -> pd.DataFrame:
     """
     Load consolidated daily holdings from processed/holdings.csv.
