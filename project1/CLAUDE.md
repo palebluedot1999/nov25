@@ -100,10 +100,10 @@ data/
 - **Smart incremental price updates** - Only fetches missing dates (checks raw files first, falls back to processed)
 - **Security metadata enrichment** - 31 fundamental fields (sector, industry, financials, ratios)
 - **Price consolidation** into master prices.csv table (188K+ records)
-- CSV data layer with all operations (portfolios, holdings, prices, transactions)
-- Dashboard with Overview, Positions, Calendar, Data Management, Portfolio Size pages
+- CSV data layer with all operations (portfolios, holdings, prices)
+- **Dashboard pages (8 total)**: Overview (1), Fund Tracking (2), P&L Analysis (3), Tracking Error (4), Calendar (5), Data Management (6), Portfolio Size (7), Prices (8)
+- **Prices page**: Bloomberg dark-theme interactive price chart (`8_Prices.py`); dark CSS injected via `st.markdown()` — the established pattern for themed pages
 - **Top 10 Holdings Weight Over Time** chart on Overview page
-- **Trade entry form** on Positions page (date, time, ticker, direction, quantity, price, cost, strategy)
 - Historical holdings view (20 quarters of Baker Bros data)
 - **Redesigned Data Management page** with 4 sections:
   - **Add New Security**: One-click workflow - automatically fetches prices and metadata (see details below)
