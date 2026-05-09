@@ -2,6 +2,15 @@
 
 A Python-based dashboard for tracking and analyzing hedge fund portfolios using SEC 13F filings.
 
+## Quick Start
+
+```bash
+source .venv/Scripts/activate
+streamlit run dashboard/Home.py
+```
+
+Open `http://localhost:8501` in your browser.
+
 ## Features
 
 - **SEC EDGAR Integration**: Scrape 13F filings directly from SEC EDGAR
@@ -54,7 +63,7 @@ project1/
 │   ├── consolidate_prices.py    # Merge individual price files into master table
 │   └── consolidate_securities.py # Merge CUSIP cache + metadata into securities.csv
 ├── dashboard/                    # Streamlit dashboard
-│   ├── app.py                   # Main dashboard app
+│   ├── Home.py                  # Main dashboard entry point
 │   ├── pages/                   # Dashboard pages
 │   │   ├── 1_Overview.py        # Portfolio summary with top holdings chart
 │   │   ├── 2_Fund_Tracking.py   # 13F holdings viewer with QoQ analytics (auto-computes on load)
@@ -153,7 +162,7 @@ This fetches 31 fundamental fields for all 161 securities and saves to `data/raw
 ### Running the Dashboard
 
 ```bash
-streamlit run dashboard/app.py
+streamlit run dashboard/Home.py
 ```
 
 The dashboard will open in your browser at `http://localhost:8501`.
