@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from utils.strategy_registry import discover_strategies, set_live, get_live_strategy
-from utils.csv_data import load_portfolios, get_all_filings, load_holdings_by_date
+from utils.csv_data import load_portfolios
 
 st.set_page_config(page_title="Research", layout="wide")
 st.title("Research")
@@ -65,14 +65,15 @@ with tab_backtest:
         if strategy.get("parameters"):
             with st.expander("Strategy parameters"):
                 for param_key, param_cfg in strategy["parameters"].items():
+                    slider_key = f"res_{strategy['module']}_{param_key}"
                     if param_cfg["type"] == "int":
                         params[param_key] = st.slider(
-                            param_cfg["label"], param_cfg["min"], param_cfg["max"], param_cfg["default"], key=f"res_{param_key}"
+                            param_cfg["label"], param_cfg["min"], param_cfg["max"], param_cfg["default"], key=slider_key
                         )
                     elif param_cfg["type"] == "float":
                         params[param_key] = st.slider(
                             param_cfg["label"], float(param_cfg["min"]), float(param_cfg["max"]),
-                            float(param_cfg["default"]), key=f"res_{param_key}"
+                            float(param_cfg["default"]), key=slider_key
                         )
 
         if st.button("▶ Run backtest", type="primary"):
@@ -89,6 +90,8 @@ with tab_backtest:
                     results = run_simulation(config)
                 st.session_state["res_results"] = results
                 st.session_state["res_config"] = config
+            except ImportError:
+                st.error("Strategy engine not yet implemented (`utils.strategy_engine` missing).")
             except Exception as e:
                 st.error(f"Backtest failed: {e}")
 
@@ -119,6 +122,8 @@ with tab_backtest:
                     if "SPY" in bench_show and "spy_return" in returns_df.columns:
                         fig.add_trace(go.Scatter(x=returns_df["date"], y=returns_df["spy_return"],
                                                  name="SPY", line=dict(color="#2ca02c", dash="dot")))
+                    if "Baker Bros" in bench_show:
+                        st.caption("Baker Bros benchmark not yet wired up — coming in a future strategy.")
                     fig.update_layout(title="Cumulative Return", xaxis_title="Date", yaxis_title="Return (%)")
                     st.plotly_chart(fig, use_container_width=True)
                 else:
