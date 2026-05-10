@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 
 STRATEGIES_DIR = Path(__file__).parent.parent / "strategies"
-REGISTRY_CSV = Path(__file__).parent.parent / "data" / "strategy_registry.csv"
+REGISTRY_CSV = Path(__file__).parent.parent / "data" / "raw" / "strategy_registry.csv"
 
 
 def _load_registry() -> pd.DataFrame:

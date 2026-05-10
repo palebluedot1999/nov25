@@ -3,9 +3,10 @@ from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent.parent / "data"
-BROKERAGE_HOLDINGS_FILE = DATA_DIR / "brokerage_holdings.csv"
-STAGED_TRADES_FILE = DATA_DIR / "staged_trades.csv"
-TRADE_LOG_FILE = DATA_DIR / "trade_log.csv"
+RAW_DATA_DIR = DATA_DIR / "raw"
+BROKERAGE_HOLDINGS_FILE = RAW_DATA_DIR / "brokerage_holdings.csv"
+STAGED_TRADES_FILE = RAW_DATA_DIR / "staged_trades.csv"
+TRADE_LOG_FILE = RAW_DATA_DIR / "trade_log.csv"
 
 HOLDINGS_COLS = ["ticker", "shares", "last_updated"]
 STAGED_COLS = ["ticker", "action", "suggested_shares", "actual_shares", "exec_price", "notes"]
