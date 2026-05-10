@@ -88,3 +88,21 @@ def test_confirm_execution_clears_staged_trades(brokerage):
     brokerage.confirm_execution(staged, strategy_name="Top-10 EW")
     remaining = brokerage.load_staged_trades()
     assert remaining.empty
+
+
+def test_confirm_execution_uses_suggested_when_actual_is_nan(brokerage):
+    """When actual_shares is NaN (user cleared the cell), falls back to suggested_shares."""
+    import numpy as np
+    staged = pd.DataFrame({
+        "ticker": ["BEAM"],
+        "action": ["BUY"],
+        "suggested_shares": [142.0],
+        "actual_shares": [np.nan],
+        "exec_price": [87.45],
+        "notes": [""],
+    })
+    brokerage.confirm_execution(staged, strategy_name="Top-10 EW")
+    log = brokerage.load_trade_log()
+    assert log.iloc[0]["actual_shares"] == 142.0  # fell back to suggested
+    holdings = brokerage.load_brokerage_holdings()
+    assert holdings[holdings["ticker"] == "BEAM"].iloc[0]["shares"] == 142.0

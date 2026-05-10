@@ -14,7 +14,11 @@ LOG_COLS = ["executed_at", "strategy", "ticker", "action", "suggested_shares", "
 
 def load_brokerage_holdings() -> pd.DataFrame:
     if not BROKERAGE_HOLDINGS_FILE.exists():
-        return pd.DataFrame(columns=HOLDINGS_COLS)
+        return pd.DataFrame({
+            "ticker": pd.Series(dtype="str"),
+            "shares": pd.Series(dtype="float64"),
+            "last_updated": pd.Series(dtype="str"),
+        })
     return pd.read_csv(BROKERAGE_HOLDINGS_FILE)
 
 
@@ -45,12 +49,18 @@ def load_trade_log() -> pd.DataFrame:
 
 
 def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = "") -> None:
-    """Append staged trades to trade log, update holdings, clear staging area."""
+    """Append staged trades to trade log, update holdings, clear staging area.
+
+    Note: not atomic — if save_brokerage_holdings() fails, staging is already cleared
+    and the partial update cannot be replayed. Acceptable limitation of CSV-only storage.
+    """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_rows = []
     for _, row in staged_df.iterrows():
         actual = float(row.get("actual_shares") if pd.notna(row.get("actual_shares")) else row["suggested_shares"])
         price = float(row.get("exec_price") if pd.notna(row.get("exec_price")) else 0)
+        # Per-row "notes" column is intentionally ignored here; the function-level
+        # `notes` arg provides a single batch-level note written to every log row.
         log_rows.append({
             "executed_at": now,
             "strategy": strategy_name,
@@ -74,7 +84,12 @@ def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = 
     for _, row in staged_df.iterrows():
         actual = float(row.get("actual_shares") if pd.notna(row.get("actual_shares")) else row["suggested_shares"])
         ticker = str(row["ticker"])
-        delta = actual if row["action"] == "BUY" else -actual
+        if row["action"] == "BUY":
+            delta = actual
+        elif row["action"] == "SELL":
+            delta = -actual
+        else:
+            raise ValueError(f"Unknown action '{row['action']}' for ticker {row['ticker']}")
         if ticker in holdings["ticker"].values:
             holdings.loc[holdings["ticker"] == ticker, "shares"] += delta
         else:
