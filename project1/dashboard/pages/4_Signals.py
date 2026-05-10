@@ -93,6 +93,10 @@ with tab_bb:
                 st.plotly_chart(fig2, use_container_width=True)
         else:
             st.dataframe(top_over_time, use_container_width=True)
+            if not holdings.empty:
+                top10 = holdings.nlargest(10, "value")
+                st.dataframe(top10[["ticker", "value"]].rename(columns={"value": "Value ($)"}),
+                             use_container_width=True, hide_index=True)
 
 # ── Prices & Markets ───────────────────────────────────────────────────────────
 with tab_prices:
@@ -139,8 +143,8 @@ with tab_prices:
             price_view = st.radio("View", ["Chart", "Table"], horizontal=True, key="sig_price_view")
 
             if compare_as == "% Return":
-                # Normalize each ticker to 100 at start date
-                start_prices = combined.groupby("ticker")["close"].first()
+                # Normalize to % return from earliest date in filtered window
+                start_prices = combined.sort_values("date").groupby("ticker")["close"].first()
                 combined = combined.copy()
                 combined["value"] = combined.apply(
                     lambda r: (r["close"] / start_prices[r["ticker"]] - 1) * 100, axis=1
