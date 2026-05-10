@@ -188,21 +188,12 @@ with st.expander("My Holdings"):
                 key="holdings_editor_empty",
             )
 
-        uploaded = st.file_uploader("Import CSV from brokerage (ticker, shares columns)", type="csv")
         save_btn = st.form_submit_button("Save holdings")
 
         if save_btn:
-            if uploaded is not None:
-                imported = pd.read_csv(uploaded)
-                if "ticker" in imported.columns and "shares" in imported.columns:
-                    save_brokerage_holdings(imported[["ticker", "shares"]])
-                    st.success(f"Imported {len(imported)} positions.")
-                else:
-                    st.error("CSV must have 'ticker' and 'shares' columns.")
-            else:
-                clean = edited_holdings[edited_holdings["ticker"].str.strip() != ""].copy()
-                save_brokerage_holdings(clean)
-                st.success("Holdings saved.")
+            clean = edited_holdings[edited_holdings["ticker"].str.strip() != ""].copy()
+            save_brokerage_holdings(clean)
+            st.success("Holdings saved.")
             st.rerun()
 
 # ── Trade History ──────────────────────────────────────────────────────────────

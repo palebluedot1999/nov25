@@ -50,19 +50,47 @@ def load_trade_log() -> pd.DataFrame:
 
 
 def save_trade_log(df: pd.DataFrame) -> None:
-    """Overwrite the trade log with an edited DataFrame. Recomputes total_value."""
+    """Overwrite the trade log with an edited DataFrame. Recomputes total_value and reconciles holdings."""
     df = df.copy()
     df["total_value"] = (df["actual_shares"].abs() * df["exec_price"]).round(2)
     df["notes"] = df["notes"].fillna("").astype(str)
     df[LOG_COLS].to_csv(TRADE_LOG_FILE, index=False)
+    reconcile_holdings_from_log()
+
+
+def reconcile_holdings_from_log() -> None:
+    """Recompute brokerage_holdings.csv from the full trade log.
+
+    Holdings are always derived from trade history — BUY adds shares, SELL subtracts.
+    Call this after any trade log mutation to keep the two in sync.
+    """
+    log = load_trade_log()
+    if log.empty:
+        pd.DataFrame(columns=HOLDINGS_COLS).to_csv(BROKERAGE_HOLDINGS_FILE, index=False)
+        return
+
+    def net_shares(grp):
+        total = 0.0
+        for _, row in grp.iterrows():
+            actual = float(row["actual_shares"])
+            if row["action"] == "BUY":
+                total += actual
+            elif row["action"] == "SELL":
+                total -= actual
+        return total
+
+    positions = (
+        log.groupby("ticker")
+        .apply(net_shares)
+        .reset_index()
+    )
+    positions.columns = ["ticker", "shares"]
+    positions["last_updated"] = datetime.now().strftime("%Y-%m-%d")
+    positions[HOLDINGS_COLS].to_csv(BROKERAGE_HOLDINGS_FILE, index=False)
 
 
 def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = "") -> None:
-    """Append staged trades to trade log, update holdings, clear staging area.
-
-    Note: not atomic — if save_brokerage_holdings() fails, staging is already cleared
-    and the partial update cannot be replayed. Acceptable limitation of CSV-only storage.
-    """
+    """Append staged trades to trade log, reconcile holdings, clear staging area."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_rows = []
     for _, row in staged_df.iterrows():
@@ -87,24 +115,5 @@ def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = 
         new_log = pd.concat([existing, new_log], ignore_index=True)
     new_log.to_csv(TRADE_LOG_FILE, index=False)
 
-    # Update brokerage holdings
-    holdings = load_brokerage_holdings()
-    for _, row in staged_df.iterrows():
-        actual = float(row.get("actual_shares") if pd.notna(row.get("actual_shares")) else row["suggested_shares"])
-        ticker = str(row["ticker"])
-        if row["action"] == "BUY":
-            delta = actual
-        elif row["action"] == "SELL":
-            delta = -actual
-        else:
-            raise ValueError(f"Unknown action '{row['action']}' for ticker {row['ticker']}")
-        if ticker in holdings["ticker"].values:
-            holdings.loc[holdings["ticker"] == ticker, "shares"] += delta
-        else:
-            holdings = pd.concat(
-                [holdings, pd.DataFrame([{"ticker": ticker, "shares": delta, "last_updated": now}])],
-                ignore_index=True,
-            )
-
-    save_brokerage_holdings(holdings)
+    reconcile_holdings_from_log()
     clear_staged_trades()
