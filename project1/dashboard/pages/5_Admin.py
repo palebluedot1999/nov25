@@ -1,6 +1,5 @@
 # dashboard/pages/5_Admin.py
 import sys
-import time
 import subprocess
 import streamlit as st
 import pandas as pd
@@ -9,11 +8,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from utils.csv_data import load_portfolios, PROCESSED_DATA_DIR
-from utils.price_operations import get_all_cached_tickers, get_fetch_status, save_fetch_status
-from utils.security_operations import add_security_with_full_data, get_cusip_cache_summary
+from utils.price_operations import get_all_cached_tickers, get_fetch_status
+from utils.security_operations import add_security_with_full_data
 from utils.security_consolidation import get_securities_summary
 from utils.fund_operations import parse_cik_input, batch_add_funds
-from utils.metadata_operations import get_metadata_fetch_status, save_metadata_fetch_status
+from utils.metadata_operations import get_metadata_fetch_status
 
 st.set_page_config(page_title="Admin", layout="wide")
 st.title("Admin")
@@ -76,13 +75,14 @@ with tab_fetch:
 with tab_securities:
     summary = get_securities_summary()
     total = summary.get("total_count", 0)
+    securities_path = PROCESSED_DATA_DIR / "securities.csv"
+    sec_df = pd.read_csv(securities_path) if securities_path.exists() else None
+
     col1, col2 = st.columns([2, 1])
     with col1:
         st.metric("Securities", total)
     with col2:
-        securities_path = PROCESSED_DATA_DIR / "securities.csv"
-        if securities_path.exists():
-            sec_df = pd.read_csv(securities_path)
+        if sec_df is not None:
             st.download_button("Export CSV", sec_df.to_csv(index=False), "securities.csv", "text/csv")
 
     st.subheader("Add Security")
@@ -99,8 +99,7 @@ with tab_securities:
                 st.error(result.get("error", "Unknown error"))
 
     st.subheader("All Securities")
-    if securities_path.exists():
-        sec_df = pd.read_csv(securities_path)
+    if sec_df is not None:
         default_cols = ["ticker", "company_name", "sector", "industry", "market_cap", "pe_ratio"]
         available = [c for c in default_cols if c in sec_df.columns]
         with st.expander("Columns"):
