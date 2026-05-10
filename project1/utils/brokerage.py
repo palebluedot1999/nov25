@@ -48,6 +48,14 @@ def load_trade_log() -> pd.DataFrame:
     return pd.read_csv(TRADE_LOG_FILE)
 
 
+def save_trade_log(df: pd.DataFrame) -> None:
+    """Overwrite the trade log with an edited DataFrame. Recomputes total_value."""
+    df = df.copy()
+    df["total_value"] = (df["actual_shares"].abs() * df["exec_price"]).round(2)
+    df["notes"] = df["notes"].fillna("").astype(str)
+    df[LOG_COLS].to_csv(TRADE_LOG_FILE, index=False)
+
+
 def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = "") -> None:
     """Append staged trades to trade log, update holdings, clear staging area.
 

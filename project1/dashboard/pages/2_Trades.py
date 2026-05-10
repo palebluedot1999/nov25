@@ -12,7 +12,7 @@ from utils.strategy_registry import discover_strategies
 from utils.brokerage import (
     load_brokerage_holdings, save_brokerage_holdings,
     load_staged_trades, save_staged_trades, clear_staged_trades,
-    confirm_execution, load_trade_log,
+    confirm_execution, load_trade_log, save_trade_log,
 )
 from utils.drift import calculate_drift, generate_trade_recommendations
 from utils.csv_data import load_portfolios, load_prices, get_all_filings
@@ -219,8 +219,36 @@ else:
         st.info(f"No trade history for {strategy['name']} yet.")
     else:
         if hist_view == "Table":
-            st.dataframe(strat_log.sort_values("executed_at", ascending=False), use_container_width=True, hide_index=True)
-            st.download_button("Export CSV", strat_log.to_csv(index=False), "trade_history.csv", "text/csv")
+            strat_log["notes"] = strat_log["notes"].fillna("").astype(str)
+            edited_log = st.data_editor(
+                strat_log.sort_values("executed_at", ascending=False).reset_index(drop=True),
+                column_config={
+                    "executed_at": st.column_config.TextColumn("Executed At", disabled=True),
+                    "strategy": st.column_config.TextColumn("Strategy", disabled=True),
+                    "ticker": st.column_config.TextColumn("Ticker", disabled=True),
+                    "action": st.column_config.TextColumn("Action", disabled=True),
+                    "suggested_shares": st.column_config.NumberColumn("Suggested", disabled=True),
+                    "actual_shares": st.column_config.NumberColumn("Actual Shares"),
+                    "exec_price": st.column_config.NumberColumn("Exec Price ($)", format="$%.2f"),
+                    "total_value": st.column_config.NumberColumn("Total ($)", disabled=True, format="$%.2f"),
+                    "notes": st.column_config.TextColumn("Notes"),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+                hide_index=True,
+                key="tr_log_editor",
+            )
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                if st.button("Save changes", key="tr_log_save"):
+                    # Merge edits back into the full log (other strategies untouched)
+                    other = trade_log[trade_log["strategy"] != strategy["name"]]
+                    updated = pd.concat([other, edited_log], ignore_index=True)
+                    save_trade_log(updated)
+                    st.success("Trade history saved.")
+                    st.rerun()
+            with col2:
+                st.download_button("Export CSV", strat_log.to_csv(index=False), "trade_history.csv", "text/csv")
         else:
             strat_log["executed_at"] = pd.to_datetime(strat_log["executed_at"])
             daily = strat_log.groupby(strat_log["executed_at"].dt.date)["total_value"].sum().reset_index()
