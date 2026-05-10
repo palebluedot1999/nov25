@@ -138,6 +138,7 @@ if not staged.empty:
     st.subheader("Staging Area")
     st.caption("Adjust actual shares and execution price before confirming.")
 
+    staged["notes"] = staged["notes"].fillna("").astype(str)
     edited = st.data_editor(
         staged[["ticker", "action", "suggested_shares", "actual_shares", "exec_price", "notes"]],
         column_config={
