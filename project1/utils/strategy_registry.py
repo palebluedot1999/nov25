@@ -53,7 +53,9 @@ def discover_strategies() -> list[dict]:
             config["status"] = _get_status(path.stem)
             config["generate_targets"] = mod.generate_targets
             configs.append(config)
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.warning("Failed to load strategy %s: %s", path.stem, e)
             continue
     return configs
 
@@ -62,14 +64,8 @@ def set_live(module_name: str) -> None:
     """Set one strategy as Live; demote all others to Research."""
     df = _load_registry()
     df["status"] = "Research"
-    if module_name in df["module_name"].values:
-        df.loc[df["module_name"] == module_name, "status"] = "Live"
-    else:
-        df = pd.concat(
-            [df, pd.DataFrame([{"module_name": module_name, "status": "Live"}])],
-            ignore_index=True,
-        )
     _save_registry(df)
+    _set_status(module_name, "Live")
 
 
 def get_live_strategy() -> dict | None:
