@@ -59,8 +59,7 @@ def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = 
     for _, row in staged_df.iterrows():
         actual = float(row.get("actual_shares") if pd.notna(row.get("actual_shares")) else row["suggested_shares"])
         price = float(row.get("exec_price") if pd.notna(row.get("exec_price")) else 0)
-        # Per-row "notes" column is intentionally ignored here; the function-level
-        # `notes` arg provides a single batch-level note written to every log row.
+        row_notes = str(row.get("notes") or "") or notes
         log_rows.append({
             "executed_at": now,
             "strategy": strategy_name,
@@ -70,7 +69,7 @@ def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = 
             "actual_shares": actual,
             "exec_price": price,
             "total_value": round(abs(actual) * price, 2),
-            "notes": notes,
+            "notes": row_notes,
         })
 
     new_log = pd.DataFrame(log_rows, columns=LOG_COLS)

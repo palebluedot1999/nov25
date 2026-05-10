@@ -8,12 +8,11 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils.strategy_registry import discover_strategies, get_live_strategy
+from utils.strategy_registry import discover_strategies
 from utils.brokerage import load_brokerage_holdings, load_trade_log
 from utils.drift import calculate_drift
-from utils.csv_data import load_portfolios, load_prices, get_all_filings
+from utils.csv_data import load_portfolios, load_prices, get_all_filings, load_processed_holdings
 from utils.holdings_operations import get_forward_filled_prices, calculate_portfolio_values
-from utils.csv_data import load_processed_holdings
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 st.title("Dashboard")
@@ -65,8 +64,9 @@ brokerage = load_brokerage_holdings()
 target_weights = strategy["generate_targets"](portfolio_id=portfolio_id)
 
 prices_df = pd.DataFrame(columns=["ticker", "close"])
-if not brokerage.empty or target_weights:
-    all_tickers = list(set(brokerage["ticker"].tolist() if not brokerage.empty else []) | set(target_weights.keys()))
+brokerage_tickers = set(brokerage["ticker"].tolist()) if not brokerage.empty else set()
+all_tickers = list(brokerage_tickers | set(target_weights.keys()))
+if all_tickers:
     price_rows = []
     for ticker in all_tickers:
         p = load_prices(ticker)

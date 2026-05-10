@@ -2,6 +2,7 @@
 import sys
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from pathlib import Path
 from datetime import datetime
 
@@ -220,7 +221,6 @@ else:
             st.dataframe(strat_log.sort_values("executed_at", ascending=False), use_container_width=True, hide_index=True)
             st.download_button("Export CSV", strat_log.to_csv(index=False), "trade_history.csv", "text/csv")
         else:
-            import plotly.express as px
             strat_log["executed_at"] = pd.to_datetime(strat_log["executed_at"])
             daily = strat_log.groupby(strat_log["executed_at"].dt.date)["total_value"].sum().reset_index()
             daily.columns = ["date", "value"]
