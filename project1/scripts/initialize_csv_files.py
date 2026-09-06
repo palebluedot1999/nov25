@@ -18,10 +18,10 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 FUNDS_CONFIG = PROJECT_ROOT / "config" / "funds.json"  # NOTE: This file no longer exists after migration
 
 # CSV files to create
-PORTFOLIOS_FILE = DATA_DIR / "portfolios.csv"
-STRATEGIES_FILE = DATA_DIR / "strategies.csv"
-TAGS_FILE = DATA_DIR / "tags.csv"
-TRANSACTIONS_FILE = DATA_DIR / "transactions.csv"
+PORTFOLIOS_FILE = RAW_DATA_DIR / "portfolios.csv"
+STRATEGIES_FILE = RAW_DATA_DIR / "strategies.csv"
+TAGS_FILE = RAW_DATA_DIR / "tags.csv"
+TRANSACTIONS_FILE = RAW_DATA_DIR / "transactions.csv"
 
 
 def load_funds_config():

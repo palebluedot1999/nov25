@@ -15,10 +15,10 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 HOLDINGS_DIR = RAW_DATA_DIR / "13f_filings"
 PRICES_DIR = RAW_DATA_DIR / "yahoo_prices"
 PROCESSED_HOLDINGS_FILE = PROCESSED_DATA_DIR / "holdings.csv"
-PORTFOLIOS_FILE = DATA_DIR / "portfolios.csv"
-STRATEGIES_FILE = DATA_DIR / "strategies.csv"
-TAGS_FILE = DATA_DIR / "tags.csv"
-TRANSACTIONS_FILE = DATA_DIR / "transactions.csv"
+PORTFOLIOS_FILE = RAW_DATA_DIR / "portfolios.csv"
+STRATEGIES_FILE = RAW_DATA_DIR / "strategies.csv"
+TAGS_FILE = RAW_DATA_DIR / "tags.csv"
+TRANSACTIONS_FILE = RAW_DATA_DIR / "transactions.csv"
 
 # ============================================================================
 # PORTFOLIOS
