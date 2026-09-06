@@ -42,8 +42,8 @@ def test_save_staged_and_load(brokerage):
 
 
 def test_confirm_execution_updates_holdings(brokerage):
-    initial = pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0], "last_updated": ["2026-01-01"]})
-    brokerage.save_brokerage_holdings(initial)
+    initial = pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0]})
+    brokerage.set_manual_holdings(initial)
 
     staged = pd.DataFrame({
         "ticker": ["ABBV", "BEAM"],
@@ -60,6 +60,73 @@ def test_confirm_execution_updates_holdings(brokerage):
     beam = holdings[holdings["ticker"] == "BEAM"].iloc[0]["shares"]
     assert abbv == 90.0
     assert beam == 50.0
+
+
+def test_manual_holdings_survive_subsequent_trade(brokerage):
+    """A manually-entered starting position must not be wiped out by an unrelated trade.
+
+    Regression test: confirm_execution() rebuilds brokerage_holdings.csv entirely from
+    trade_log.csv (reconcile_holdings_from_log). A manual entry that never became a log
+    row used to vanish the moment any trade — even in a different ticker — was confirmed.
+    """
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0]}))
+
+    staged = pd.DataFrame({
+        "ticker": ["BEAM"],
+        "action": ["BUY"],
+        "suggested_shares": [50.0],
+        "actual_shares": [50.0],
+        "exec_price": [62.0],
+        "notes": [""],
+    })
+    brokerage.confirm_execution(staged, strategy_name="Top-10 EW")
+
+    holdings = brokerage.load_brokerage_holdings()
+    abbv = holdings[holdings["ticker"] == "ABBV"].iloc[0]["shares"]
+    assert abbv == 100.0
+
+
+def test_set_manual_holdings_logs_adjustment_entries(brokerage):
+    """set_manual_holdings() records the delta as trade-log rows, not a side-channel write."""
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0]}))
+    log = brokerage.load_trade_log()
+    assert len(log) == 1
+    assert log.iloc[0]["ticker"] == "ABBV"
+    assert log.iloc[0]["action"] == "BUY"
+    assert log.iloc[0]["actual_shares"] == 100.0
+    assert log.iloc[0]["strategy"] == "Manual Adjustment"
+
+
+def test_set_manual_holdings_computes_delta_against_existing_position(brokerage):
+    """A second manual edit logs only the difference from the current derived position."""
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0]}))
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": ["ABBV"], "shares": [80.0]}))
+
+    log = brokerage.load_trade_log()
+    assert len(log) == 2
+    assert log.iloc[1]["action"] == "SELL"
+    assert log.iloc[1]["actual_shares"] == 20.0
+
+    holdings = brokerage.load_brokerage_holdings()
+    assert holdings[holdings["ticker"] == "ABBV"].iloc[0]["shares"] == 80.0
+
+
+def test_set_manual_holdings_closes_removed_position(brokerage):
+    """Removing a ticker from the manual editor logs a SELL that zeroes it out."""
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0]}))
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": [], "shares": []}))
+
+    holdings = brokerage.load_brokerage_holdings()
+    abbv_rows = holdings[holdings["ticker"] == "ABBV"]
+    assert abbv_rows.empty or abbv_rows.iloc[0]["shares"] == 0.0
+
+
+def test_set_manual_holdings_noop_when_unchanged(brokerage):
+    """Re-saving the same values logs no new rows."""
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0]}))
+    brokerage.set_manual_holdings(pd.DataFrame({"ticker": ["ABBV"], "shares": [100.0]}))
+    log = brokerage.load_trade_log()
+    assert len(log) == 1
 
 
 def test_confirm_execution_writes_trade_log(brokerage):

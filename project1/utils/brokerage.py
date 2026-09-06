@@ -58,16 +58,10 @@ def save_trade_log(df: pd.DataFrame) -> None:
     reconcile_holdings_from_log()
 
 
-def reconcile_holdings_from_log() -> None:
-    """Recompute brokerage_holdings.csv from the full trade log.
-
-    Holdings are always derived from trade history — BUY adds shares, SELL subtracts.
-    Call this after any trade log mutation to keep the two in sync.
-    """
-    log = load_trade_log()
+def _net_shares_by_ticker(log: pd.DataFrame) -> dict[str, float]:
+    """BUY adds shares, SELL subtracts. Returns {ticker: net_shares}, omitting empty logs."""
     if log.empty:
-        pd.DataFrame(columns=HOLDINGS_COLS).to_csv(BROKERAGE_HOLDINGS_FILE, index=False)
-        return
+        return {}
 
     def net_shares(grp):
         total = 0.0
@@ -79,14 +73,68 @@ def reconcile_holdings_from_log() -> None:
                 total -= actual
         return total
 
-    positions = (
-        log.groupby("ticker")
-        .apply(net_shares)
-        .reset_index()
-    )
-    positions.columns = ["ticker", "shares"]
-    positions["last_updated"] = datetime.now().strftime("%Y-%m-%d")
-    positions[HOLDINGS_COLS].to_csv(BROKERAGE_HOLDINGS_FILE, index=False)
+    return log.groupby("ticker").apply(net_shares, include_groups=False).to_dict()
+
+
+def reconcile_holdings_from_log() -> None:
+    """Recompute brokerage_holdings.csv from the full trade log.
+
+    Holdings are always derived from trade history — BUY adds shares, SELL subtracts.
+    Call this after any trade log mutation to keep the two in sync.
+    """
+    positions = _net_shares_by_ticker(load_trade_log())
+    if not positions:
+        pd.DataFrame(columns=HOLDINGS_COLS).to_csv(BROKERAGE_HOLDINGS_FILE, index=False)
+        return
+
+    df = pd.DataFrame(list(positions.items()), columns=["ticker", "shares"])
+    df["last_updated"] = datetime.now().strftime("%Y-%m-%d")
+    df[HOLDINGS_COLS].to_csv(BROKERAGE_HOLDINGS_FILE, index=False)
+
+
+def set_manual_holdings(edited_df: pd.DataFrame) -> None:
+    """Apply a manually-edited "current positions" table as trade-log adjustment entries.
+
+    Holdings are always derived from trade_log.csv (see reconcile_holdings_from_log), so a
+    manual edit must be recorded as history rather than written directly to the holdings
+    file — a direct write would be silently discarded the next time any trade executes,
+    since that rebuilds the holdings file from the log alone.
+
+    Logs the delta between the edited shares and the current log-derived position per
+    ticker (as a BUY/SELL with strategy "Manual Adjustment"), including closing out any
+    ticker present in current holdings but absent from edited_df.
+    """
+    current = _net_shares_by_ticker(load_trade_log())
+    edited = dict(zip(edited_df["ticker"], edited_df["shares"].astype(float)))
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_rows = []
+    for ticker in set(current) | set(edited):
+        delta = edited.get(ticker, 0.0) - current.get(ticker, 0.0)
+        if abs(delta) < 1e-9:
+            continue
+        log_rows.append({
+            "executed_at": now,
+            "strategy": "Manual Adjustment",
+            "ticker": ticker,
+            "action": "BUY" if delta > 0 else "SELL",
+            "suggested_shares": abs(delta),
+            "actual_shares": abs(delta),
+            "exec_price": 0.0,
+            "total_value": 0.0,
+            "notes": "Manual holdings entry",
+        })
+
+    if not log_rows:
+        return
+
+    new_log = pd.DataFrame(log_rows, columns=LOG_COLS)
+    if TRADE_LOG_FILE.exists():
+        existing = pd.read_csv(TRADE_LOG_FILE)
+        new_log = pd.concat([existing, new_log], ignore_index=True)
+    new_log.to_csv(TRADE_LOG_FILE, index=False)
+
+    reconcile_holdings_from_log()
 
 
 def confirm_execution(staged_df: pd.DataFrame, strategy_name: str, notes: str = "") -> None:

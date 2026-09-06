@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from utils.strategy_registry import discover_strategies
 from utils.brokerage import (
-    load_brokerage_holdings, save_brokerage_holdings,
+    load_brokerage_holdings, set_manual_holdings,
     load_staged_trades, save_staged_trades, clear_staged_trades,
     confirm_execution, load_trade_log, save_trade_log,
 )
@@ -192,7 +192,7 @@ with st.expander("My Holdings"):
 
         if save_btn:
             clean = edited_holdings[edited_holdings["ticker"].str.strip() != ""].copy()
-            save_brokerage_holdings(clean)
+            set_manual_holdings(clean)
             st.success("Holdings saved.")
             st.rerun()
 
