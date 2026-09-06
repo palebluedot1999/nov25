@@ -40,7 +40,11 @@
       "Bash(mv data/portfolios.csv data/raw/)",
       "Bash(mv data/staged_trades.csv data/raw/)",
       "Bash(mv data/tags.csv data/raw/)",
-      "Bash(mv data/trade_log.csv data/raw/)"
+      "Bash(mv data/trade_log.csv data/raw/)",
+      "Bash(Remove-Item -Recurse -Force utils/__pycache__, dashboard/__pycache__, dashboard/pages/__pycache__ -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Cleared pycache\")",
+      "Bash(claude --version)",
+      "Bash(jq --version)"
     ],
     "deny": [],
     "ask": []
