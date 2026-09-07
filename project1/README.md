@@ -1,6 +1,6 @@
 # Hedge Fund Portfolio Tracker
 
-A Python-based dashboard for tracking and analyzing hedge fund portfolios using SEC 13F filings.
+A Python/Streamlit tool for tracking hedge fund 13F holdings and running a strategy-driven paper-trading brokerage workflow on top of them — scrape SEC 13F filings, derive a target portfolio from a strategy, compare it against your actual brokerage holdings, and log trades to close the drift.
 
 ## Quick Start
 
@@ -9,364 +9,121 @@ source .venv/Scripts/activate
 streamlit run dashboard/Home.py
 ```
 
-Open `http://localhost:8501` in your browser.
+Open `http://localhost:8501` in your browser — it redirects straight to the Dashboard page.
 
-## Features
+## How it fits together
 
-- **SEC EDGAR Integration**: Scrape 13F filings directly from SEC EDGAR
-- **Yahoo Finance Integration**: Fetch real-time and historical price data with smart incremental updates
-- **Security Metadata Enrichment**: 31 fundamental data fields (sector, industry, financials, ratios)
-- **Background Price Fetching**: Parallel processing (10x faster) with real-time progress tracking
-- **Interactive Dashboard**: Streamlit-based UI viewable in browser
-- **CSV-Only Storage**: Simplified architecture with no database dependencies
-- **Analysis Tools**:
-  - Portfolio positions and concentration metrics
-  - Top 10 holdings weight over time visualization
-  - **QoQ Analytics**: Shares Δ%, Value Δ%, Weight Δ in basis points — auto-computed on first load
-  - Filing calendar with 5-year historical data
-  - Manual trade entry and tracking
-- **Portfolio Size Analysis**: Daily portfolio value tracking (118K+ records, 4-6% accuracy vs 13F)
+1. **Scrape** — SEC EDGAR 13F filings (`scrapers/sec_edgar.py`) and Yahoo Finance prices/fundamentals (`scrapers/yahoo_finance.py`) land in `data/raw/`.
+2. **Strategy** — a strategy module in `strategies/` (auto-discovered by `utils/strategy_registry.py`) turns a fund's latest 13F holdings into a target weight per ticker.
+3. **Drift** — `utils/drift.py` compares those targets against your actual brokerage holdings (`utils/brokerage.py`) and produces buy/sell recommendations.
+4. **Trade** — you stage and confirm trades on the Trades page; confirmed trades are appended to `data/raw/trade_log.csv`, which is the single source of truth for your current holdings (`reconcile_holdings_from_log()` rebuilds `brokerage_holdings.csv` from it on every mutation).
+
+## Dashboard Pages
+
+| Page | What it's for |
+|---|---|
+| **Dashboard** | Header strip (targets last updated, last trade, drift age), portfolio value over time, drift table for the selected strategy |
+| **Trades** | Stage recommended trades, confirm execution, manually edit current holdings ("My Holdings"), view/edit trade history |
+| **Research** | Backtest a strategy over a date range, compare strategies, promote one to "Live" |
+| **Signals** | Baker Bros holdings + QoQ analytics (Shares Δ%, Value Δ%, Weight Δ bp), multi-ticker price charts |
+| **Admin** | Fetch 13Fs/prices/metadata, add securities, consolidate data files, batch-add funds by CIK |
 
 ## Project Structure
 
 ```
 project1/
-├── config/                       # Configuration files
-│   └── settings.py              # App settings and SEC User-Agent
-├── scrapers/                     # Data scraping modules
-│   ├── sec_edgar.py             # SEC EDGAR 13F scraper
-│   └── yahoo_finance.py         # Yahoo Finance price fetcher
-├── data/                         # CSV-based data storage
-│   ├── portfolios.csv           # Portfolio metadata
-│   ├── strategies.csv           # Strategy definitions
-│   ├── tags.csv                 # Custom tags for categorization
-│   ├── transactions.csv         # Manual trade entries
-│   ├── raw/                     # Raw data from external sources
-│   │   ├── cusip_cache.csv      # CUSIP↔Ticker mappings (162 entries)
-│   │   ├── security_metadata.csv # Fundamental data (161 securities, 31 fields)
-│   │   ├── price_fetch_status.json # Background price fetch status tracking
-│   │   ├── metadata_fetch_status.json # Background metadata fetch status tracking
-│   │   ├── 13f_filings/         # SEC 13F quarterly holdings (one CSV per filing)
-│   │   └── yahoo_prices/        # Yahoo Finance price data (one CSV per ticker)
-│   └── processed/               # Processed/consolidated data
-│       ├── prices.csv           # Master price table (188K+ records, 162 tickers)
-│       ├── securities.csv       # Master securities table (162 entries, CUSIP + metadata)
-│       ├── holdings.csv         # Daily holdings (118K+ records, 2020-present)
-│       └── qoq_changes.csv      # Pre-computed QoQ Δ% and weight Δ (bp) for all filing pairs
-├── scripts/                      # Initialization and backfill scripts
-│   ├── initialize_csv_files.py  # Create CSV data files
-│   ├── backfill_historical_holdings.py # Fetch historical 13F filings
-│   ├── background_price_fetch.py # Background price fetching with status tracking
-│   ├── background_metadata_fetch.py # Background metadata fetching with status tracking
-│   ├── fetch_all_prices.py      # Bulk fetch 5yr prices for all holdings
-│   ├── fetch_security_metadata.py # Fetch fundamental data from Yahoo Finance
-│   ├── consolidate_prices.py    # Merge individual price files into master table
-│   └── consolidate_securities.py # Merge CUSIP cache + metadata into securities.csv
-├── dashboard/                    # Streamlit dashboard
-│   ├── Home.py                  # Main dashboard entry point
-│   ├── pages/                   # Dashboard pages
-│   │   ├── 1_Overview.py        # Portfolio summary with top holdings chart
-│   │   ├── 2_Fund_Tracking.py   # 13F holdings viewer with QoQ analytics (auto-computes on load)
-│   │   ├── 5_Calendar.py
-│   │   ├── 6_Data_Management.py # Security addition, bulk ops, Compute QoQ Changes
-│   │   ├── 7_Portfolio_Size.py  # Daily portfolio value tracking and position breakdown
-│   │   └── 8_Price_Graphs.py    # Interactive price charts per ticker
-│   └── components/              # Reusable UI components
-├── utils/                        # Utilities
-│   ├── csv_data.py              # CSV data layer (replaces database) + load_qoq_changes()
-│   ├── data_processing.py       # Data transformations + compute_and_save_qoq_changes()
-│   ├── price_operations.py      # Smart incremental price fetching with parallel processing
-│   ├── security_operations.py   # Security addition with OpenFIGI lookup and one-click orchestration
-│   ├── metadata_operations.py   # Fetch and manage security fundamental data with background processing
-│   ├── security_consolidation.py # Merge CUSIP cache with metadata into master securities table
-│   └── fund_operations.py       # Batch CIK processing and portfolio creation
-├── tests/                        # Unit tests
-│   └── test_security_operations.py # Security operations tests (11 tests)
-├── requirements.txt              # Dependencies
-└── README.md
+├── config/                  # App settings (SEC User-Agent, etc.)
+├── scrapers/                 # SEC EDGAR + Yahoo Finance fetchers
+├── strategies/                # Strategy modules (STRATEGY_CONFIG + generate_targets())
+│   └── baker_bros_top10_ew.py
+├── utils/
+│   ├── csv_data.py            # CSV data layer
+│   ├── strategy_registry.py   # Auto-discover strategies, Live/Research status
+│   ├── brokerage.py           # Holdings/staged trades/trade log, derived from trade history
+│   ├── drift.py               # Target vs. actual drift + trade recommendations
+│   ├── strategy_engine.py     # Backtest simulation
+│   ├── holdings_operations.py # Quarterly 13F → daily holdings, forward-filled pricing
+│   ├── price_operations.py    # Parallel incremental price fetching
+│   ├── security_operations.py / security_consolidation.py / metadata_operations.py
+│   ├── fund_operations.py     # Batch CIK processing
+│   └── data_processing.py     # QoQ change computation
+├── dashboard/
+│   ├── Home.py                # Redirects to Dashboard
+│   └── pages/
+│       ├── 1_Dashboard.py
+│       ├── 2_Trades.py
+│       ├── 3_Research.py
+│       ├── 4_Signals.py
+│       └── 5_Admin.py
+├── scripts/                  # One-off init/backfill/consolidation scripts
+├── tests/                    # pytest suite (brokerage, drift, strategy registry, security ops)
+├── data/
+│   ├── raw/                   # 13F filings, Yahoo prices, cusip cache, trade log, staged trades, brokerage holdings
+│   └── processed/             # Master tables: prices, securities, holdings, qoq_changes
+├── docs/                      # Design specs and implementation notes
+└── requirements.txt
 ```
 
 ## Tech Stack
 
-- **Python**: 3.12.10
-- **Dashboard**: Streamlit
-- **Storage**: CSV-only (no database)
-- **Data Sources**:
-  - SEC EDGAR (13F filings)
-  - Yahoo Finance (price data and fundamental metadata)
-  - OpenFIGI API (CUSIP-to-ticker mapping, optional)
+- **Python** 3.12, **Streamlit**, **Pandas**, **Plotly**
+- **Storage**: CSV-only, no database
+- **Data sources**: SEC EDGAR (13F filings), Yahoo Finance (prices + fundamentals), OpenFIGI (CUSIP↔ticker, optional)
 
 ## Setup
 
-### 1. Install Python 3.12
-
 ```bash
+# 1. Python 3.12 + venv
 py install 3.12
-```
-
-### 2. Create and activate virtual environment
-
-```bash
 python -m venv .venv
-source .venv/Scripts/activate  # Windows Git Bash
-# OR
-.venv\Scripts\activate         # Windows CMD
-# OR
-source .venv/bin/activate      # Linux/macOS
-```
+source .venv/Scripts/activate   # Windows Git Bash; use .venv\Scripts\activate on cmd
 
-### 3. Install dependencies
-
-```bash
+# 2. Dependencies
 pip install -r requirements.txt
-```
 
-### 4. Update SEC User Agent
+# 3. Set your SEC User-Agent (required by SEC — needs a real contact email)
+#    edit config/settings.py
 
-Edit `config/settings.py` and update `SEC_USER_AGENT` with your contact email (required by SEC).
-
-### 5. Initialize CSV data files
-
-```bash
+# 4. Initialize CSV data files
 python scripts/initialize_csv_files.py
-```
 
-This creates the necessary CSV files:
-- `data/portfolios.csv` - Portfolio definitions
-- `data/strategies.csv` - Strategy categories
-- `data/tags.csv` - Custom tags
-- `data/transactions.csv` - Manual trades
-
-### 6. Backfill historical data (optional)
-
-To fetch 5 years of historical 13F filings for Baker Bros:
-
-```bash
+# 5. (optional) Backfill 5 years of historical 13F filings
 python scripts/backfill_historical_holdings.py
-```
 
-This downloads 20 quarterly filings (2021-2025) to `data/raw/13f_filings/`.
-
-### 7. Fetch security metadata (optional)
-
-To enrich securities with fundamental data (sector, industry, financials):
-
-```bash
+# 6. (optional) Fetch security fundamentals
 python scripts/fetch_security_metadata.py
-```
 
-This fetches 31 fundamental fields for all 161 securities and saves to `data/raw/security_metadata.csv`.
-
-## Usage
-
-### Running the Dashboard
-
-```bash
+# 7. Run it
 streamlit run dashboard/Home.py
 ```
 
-The dashboard will open in your browser at `http://localhost:8501`.
-
-### Dashboard Pages
-
-1. **Overview**: Portfolio summary, key metrics, and top 10 holdings weight over time chart
-2. **Fund Tracking**: 13F holdings viewer with QoQ analytics — Shares Δ%, Value Δ%, Weight Δ (bp) auto-computed on first load; navigate between quarters; pull latest 13F filings; add new funds by CIK
-5. **Calendar**: SEC filing calendar and history
-6. **Data Management**:
-   - **Add New Security**: One-click "Execute" — fetches prices and metadata automatically (~7-10 seconds)
-   - **View Securities**: Master table with all 162 securities and their 31 metadata fields
-   - **Bulk Operations** (Advanced): Background price/metadata fetching, consolidation scripts, and **Compute QoQ Changes** per fund
-   - **Advanced Tools**: Batch CIK processing, fund portfolio management
-7. **Portfolio Size Analysis**: Daily portfolio value tracking (2025 YTD), stacked position breakdown chart, accuracy within 4-6% of official 13F values
-8. **Price Graphs**: Interactive price charts per ticker
-
-### Fetching New Data
-
-From the **Data Management** page:
-
-#### One-Click Security Addition (Recommended)
-1. **Add New Security**:
-   - Enter ticker symbol (e.g., "MSFT") in the form
-   - Click **"Execute"** button
-   - Automatically fetches 5-year price history + 31 metadata fields (~7-10 seconds)
-   - Immediately visible in "View Securities" table below
-   - Shows detailed step-by-step results
-
-#### Bulk Operations (Advanced)
-Expand **"Bulk Operations (Advanced)"** section for batch processing:
-
-1. **Bulk Price Fetch**: Automatically fetches missing price data for all 162 securities using parallel processing (10x faster). Runs in background with real-time progress tracking.
-2. **Bulk Metadata Fetch**: Background fetch of 31 fundamental fields (sector, industry, financials) for all securities. Takes ~1-2 minutes with rate limiting.
-3. **Consolidate Securities**: Merge CUSIP cache with metadata into master `securities.csv` table (162 entries, 32 columns).
-4. **Consolidate Prices**: Merge individual ticker price files into master `prices.csv` table.
-5. **Consolidate Holdings**: Process quarterly 13F filings into daily holdings table.
-6. **Compute QoQ Changes**: Pre-compute Shares Δ%, Value Δ%, and Weight Δ (basis points) for all filing pairs per fund. Saves to `data/processed/qoq_changes.csv`. Fund Tracking auto-triggers this on first load.
-
-#### Advanced Tools
-Expand **"Advanced Tools"** section for batch fund management:
-
-1. **Add Fund Portfolio**: Batch add multiple funds by CIK with automatic SEC name lookup and holdings download.
-
-### Manual Trade Entry
-
-From the **Positions** page, use the trade entry form to log manual trades:
-- Date and time
-- Ticker symbol
-- Direction (Buy/Sell)
-- Quantity
-- Price and total cost
-- Strategy assignment
-
-Trades are saved to `data/transactions.csv`.
-
-### Command Line Usage
-
-```python
-# Fetch latest filing
-from scrapers.sec_edgar import scrape_13f_filing
-scrape_13f_filing(cik='1263508', portfolio_id='baker-bros')
-
-# Get portfolio holdings
-from utils.csv_data import get_latest_holdings
-holdings = get_latest_holdings('baker-bros')
-
-# Fetch price data
-from scrapers.yahoo_finance import fetch_price_data
-prices = fetch_price_data('AAPL', start_date='2024-01-01')
-```
+Or drive the same steps from the dashboard's **Admin** page instead of the CLI.
 
 ## Default Fund
 
-The project is pre-configured to track:
+- **Baker Bros. Advisors LP** (CIK 1263508), benchmarked against **XBI**
+- Add more funds via Admin → Advanced (batch CIK add), or by editing `data/raw/portfolios.csv` directly
 
-- **Baker Bros. Advisors LP** (CIK: 1263508)
-- **Benchmark**: XBI (SPDR S&P Biotech ETF)
-- **Historical Data**: 20 quarterly filings (Q1 2021 - Q3 2025)
-- **Securities**: 162 total (161 holdings + XBI benchmark)
-  - 160 with full metadata (31 fields)
-  - 2 without metadata (newly added)
-- **Price Data**: 188K+ records across 162 tickers
-- **Master Tables**:
-  - `securities.csv`: 162 rows × 32 columns (CUSIP + ticker + metadata)
-  - `prices.csv`: 188K+ rows × 10 columns (price history)
-
-## Adding More Funds
-
-Edit `data/portfolios.csv` to add additional funds:
-
-```csv
-portfolio_id,name,cik,benchmark,active
-new-fund,New Fund Name,0001234567,SPY,true
-```
-
-Then use the Data Management page or run the scraper manually:
-
-```python
-from scrapers.sec_edgar import scrape_13f_filing
-scrape_13f_filing(cik='0001234567', portfolio_id='new-fund')
-```
-
-## Data Format
-
-### Holdings CSVs
-
-Each quarterly filing is stored as a separate CSV in `data/raw/13f_filings/`:
-
-```
-baker-bros_2025-11-14_holdings.csv
-```
-
-Columns:
-- `portfolio_id`: Fund identifier
-- `filing_date`: Date filing was submitted
-- `period_end_date`: Quarter end date
-- `cusip`: Security CUSIP
-- `ticker`: Stock ticker (mapped via OpenFIGI)
-- `company_name`: Issuer name
-- `shares`: Number of shares held
-- `value`: Market value (in dollars, not thousands)
-- `percent_of_portfolio`: Position weight
-
-### Portfolio CSV
-
-`data/portfolios.csv` defines tracked funds:
-
-```csv
-portfolio_id,name,cik,benchmark,active
-baker-bros,Baker Bros. Advisors LP,1263508,XBI,true
-```
-
-## Data Sources
-
-- **SEC EDGAR**: 13F-HR filings (quarterly institutional holdings)
-- **Yahoo Finance**: Stock prices, benchmark data, and fundamental metadata (31 fields)
-- **OpenFIGI**: CUSIP-to-ticker symbol mapping (optional, API key recommended)
-- **Future**: Whale Wisdom, DataRoma
-
-## Current Data Coverage
-
-- **Securities**: 162 total from Baker Bros portfolio + benchmark
-  - Holdings: 161 securities
-  - Benchmark: XBI (SPDR S&P Biotech ETF)
-  - With metadata: 160 securities
-  - Without metadata: 2 securities (newly added)
-- **Price Records**: 188K+ historical price records (5 years)
-- **Metadata Fields**: 31 fundamental data points per security
-  - Company info, market data, valuation ratios, financials, balance sheet, institutional holdings
-- **Historical Period**: 5 years (2021-2025, 20 quarterly filings)
-- **Master Tables**:
-  - `securities.csv`: Complete security reference with CUSIP, ticker, and metadata
-  - `prices.csv`: All historical price data consolidated
-
-## Important Notes
-
-- **13F Filings**: Reported quarterly, approximately 45 days after quarter end
-- **Position Values**: SEC reports values in thousands; scraper converts to actual dollars
-- **SEC Rate Limit**: 10 requests per second (enforced by User-Agent header)
-- **CUSIP Mapping**: Cached in `data/raw/cusip_cache.csv` to minimize OpenFIGI API calls
-- **Data Updates**: Dashboard fetches data on page load (no background scheduler)
-
-## Development
-
-### Running Tests
+## Testing
 
 ```bash
-# Run all tests
 pytest tests/ -v
-
-# Run specific test file
-pytest tests/test_security_operations.py -v
-
-# With coverage
-pytest tests/ --cov=utils --cov=scrapers
 ```
 
-Current test coverage:
-- `tests/test_security_operations.py` - 11 tests for CUSIP/ticker resolution (all passing)
+Covers brokerage (holdings/trade-log reconciliation), drift calculation, strategy registry discovery, and CUSIP/ticker resolution.
 
-### Code Structure
+## Notes
 
-- **Scrapers**: Fetch raw data from external sources
-- **Utils**: Data layer (`csv_data.py`) and transformations
-- **Dashboard**: Streamlit UI and visualization
-- **Scripts**: One-time setup and backfill operations
+- 13F filings are quarterly, filed ~45 days after quarter end; SEC reports position values in thousands (the scraper converts to dollars).
+- Data is fetched on dashboard load — there's no background scheduler.
+- CUSIP↔ticker mapping is cached in `data/raw/cusip_cache.csv` to minimize OpenFIGI calls.
 
-## Future Enhancements
+## Open items
 
-- [ ] Implement P&L and tracking error analysis (currently placeholders in dashboard)
-- [ ] Add Whale Wisdom scraper
-- [ ] Add DataRoma scraper
-- [x] ~~Historical position change visualization (QoQ analysis)~~ (Shares Δ%, Value Δ%, Weight Δ bp on Fund Tracking page)
-- [ ] Multi-fund comparison view
-- [ ] More interactive Plotly charts
-- [ ] More unit tests for scrapers and analysis modules
-- [x] ~~CUSIP-to-ticker mapping~~ (Implemented via OpenFIGI API)
-- [x] ~~CSV-only storage migration~~ (Complete - database removed)
-- [x] ~~Background price fetching~~ (Parallel processing with status tracking)
-- [x] ~~Security metadata enrichment~~ (31 fundamental fields from Yahoo Finance)
-- [x] ~~Securities master table~~ (Consolidated CUSIP + ticker + metadata)
-- [x] ~~Background metadata fetching~~ (Real-time progress tracking)
-- [x] ~~Unit tests for security operations~~ (11 tests passing)
+- P&L and tracking-error analysis (still placeholders)
+- Whale Wisdom / DataRoma scrapers
+- Multi-fund comparison view
+- More unit test coverage for scrapers and analysis modules
 
 ## License
 
