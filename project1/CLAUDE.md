@@ -54,6 +54,10 @@ streamlit run dashboard/app.py
 - **Quarterly filing data used as cost basis for P&L**
 - **Data fetched on-demand when dashboard loads** (no background scheduler)
 
+## Strategies
+
+The strategy/backtest system (`strategies/`, `utils/strategy_registry.py`, `utils/strategy_engine.py`, `utils/drift.py`) turns a fund's 13F holdings into target weights, backtests them, and drives the Trades/Research pages. See `docs/STRATEGIES.md` for the full roster of every strategy conceived (including ones that were built and later reverted) and `docs/backtest_log.csv` for every backtest run's parameters and results.
+
 ## What's Working
 - SEC EDGAR scraper for 13F filings (saves to CSV with dates)
 - Yahoo Finance price fetcher (saves to CSV)
