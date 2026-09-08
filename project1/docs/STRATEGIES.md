@@ -20,8 +20,8 @@ This is not itself a strategy — it's a risk-management layer in `utils/strateg
 - **Thesis:** Ride Baker Bros' highest-conviction (by reported 13F value) positions, on the assumption that a hedge fund's largest holdings reflect its strongest views.
 - **Selection logic:** Top 10 Baker Bros holdings by 13F value at the most recent filing.
 - **Weighting:** Equal weight across selected positions.
-- **Code:** `strategies/baker_bros_top10_ew.py`
-- **Latest result:** -20.2% portfolio return vs. XBI +32.4% (2020-11-30 to 2026-02-06, $1,000/month contribution). See `docs/backtest_log.csv` for the full parameter set and all runs.
+- **Code:** `strategies/baker_bros_top10_ew.py` (feeds the live strategy registry / drift / Trades page) and `_select_top_holdings()` in `utils/strategy_engine.py` (a separate implementation of the same logic, used by the backtest engine)
+- **Baseline result (default parameters, hard stop -40%):** -20.2% portfolio return vs. XBI +32.4% (2020-11-30 to 2026-02-06, $1,000/month contribution). See `docs/backtest_log.csv` for the full parameter set and all runs.
 
 ## Strategy 2: Top Holdings, Conviction Rank
 

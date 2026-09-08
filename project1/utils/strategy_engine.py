@@ -3,7 +3,7 @@ Strategy 1 backtesting engine: Baker Bros Top-10 Equal-Weight.
 
 Architecture:
 - Run simulation once via run_simulation() or scripts/run_backtest.py
-- Results saved to 3 CSVs in data/processed/
+- Results saved per-run to data/processed/backtest_runs/<run_id>/, summarized in docs/backtest_log.csv
 - Dashboard reads CSVs at render time (no re-simulation on page load)
 
 Strategy rules:
@@ -39,8 +39,8 @@ BACKTEST_LOG_COLUMNS = [
     "run_id", "strategy", "monthly_contribution", "max_positions", "min_hold_months",
     "trade_day", "hard_stop_return", "relative_bleed_return",
     "relative_bleed_xbi_underperformance", "freeze_return_threshold", "portfolio_id",
-    "period_start", "period_end", "cumulative_invested", "ending_value",
-    "portfolio_return", "xbi_return", "vs_xbi_pp", "active_positions",
+    "benchmark_ticker", "period_start", "period_end", "cumulative_invested", "ending_value",
+    "portfolio_return", "xbi_return", "vs_xbi_pp", "active_positions", "frozen_positions",
     "sold_positions", "output_dir",
 ]
 
@@ -321,6 +321,7 @@ def _append_backtest_log(
         "relative_bleed_xbi_underperformance": config.relative_bleed_xbi_underperformance,
         "freeze_return_threshold": config.freeze_return_threshold,
         "portfolio_id": config.portfolio_id,
+        "benchmark_ticker": config.benchmark_ticker,
         "period_start": first["date"],
         "period_end": last["date"],
         "cumulative_invested": last["cumulative_invested"],
@@ -329,6 +330,7 @@ def _append_backtest_log(
         "xbi_return": round(last["xbi_return"], 6),
         "vs_xbi_pp": round((last["portfolio_return"] - last["xbi_return"]) * 100, 2),
         "active_positions": int((positions_df["status"] == "active").sum()) if not positions_df.empty else 0,
+        "frozen_positions": int((positions_df["status"] == "frozen").sum()) if not positions_df.empty else 0,
         "sold_positions": int((positions_df["status"] == "sold").sum()) if not positions_df.empty else 0,
         "output_dir": str(output_dir.relative_to(PROJECT_ROOT)).replace("\\", "/"),
     }
