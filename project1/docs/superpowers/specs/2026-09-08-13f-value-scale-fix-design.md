@@ -12,7 +12,7 @@ Auditing the 13F ingestion/transform/use pipeline surfaced a silent, unflagged u
 This is not a scraper bug. It's the SEC's own June 2022 Form 13F amendment, which requires whole-dollar reporting effective for reporting periods ending 2022-12-31 and later ([Toppan Merrill](https://www.toppanmerrill.com/blog/sec-updates-edgar-on-jan-3-2023-for-form-13f-changes/); [Harvard Law/CorpGov](https://corpgov.law.harvard.edu/2022/08/06/amendments-to-form-13f/)). Verified directly in this project's data: the `period_end_date=2022-09-30` filing (`baker-bros_2022-11-14_holdings.csv`) is in thousands; the very next filing, `period_end_date=2022-12-31` (`baker-bros_2023-02-14_holdings.csv`), is in whole dollars — an exact match to the rule's effective date, with no partial/mixed filings at the boundary.
 
 **Confirmed downstream damage** (from a same-position sanity check on a security held unchanged across the boundary — AbCellera Biologics, CUSIP `00288U106`, 10,450,180 shares held through the transition):
-- `utils/csv_data.py`'s `get_all_filings()` sums raw `value` into `total_value`, shown as "AUM ($B)" on the Signals page — wrong by 1000x for every one of the 31 filings before the 2022-12-31 period (roughly two-thirds of this fund's 46-filing history).
+- `utils/csv_data.py`'s `get_all_filings()` sums raw `value` into `total_value`, shown as "AUM ($B)" on the Signals page — wrong by 1000x for every one of the 32 filings before the 2022-12-31 period (roughly two-thirds of this fund's 46-filing history).
 - `utils/data_processing.py`'s `compute_and_save_qoq_changes()` computes `value_delta_pct` by diffing raw `value` between adjacent quarters — for the one quarter-pair spanning the boundary (Q3 2022 → Q4 2022), every single held position gets a nonsensical ~1000x "change."
 - Weight-based figures (top-N selection, `qoq_weight_delta` in basis points) are **not** affected — those divide `value` by that same filing's own total, so the scale cancels out within a single file. Only cross-file dollar comparisons break.
 - The existing Dashboard portfolio-value line (`utils/holdings_operations.py`) is also unaffected — it reprices via `shares × Yahoo Finance close price`, never reading the 13F `value` field at all. That's a separate, independent pipeline; it was never a fix for this bug, just accidentally immune to it.
@@ -38,59 +38,67 @@ def normalize_13f_value(value: float, period_end_date: str) -> float:
     dollars to whole dollars. Filings for earlier periods must be
     multiplied by 1000 to match; later filings are already correct.
     """
+    period_end_date = str(period_end_date)
+    if not period_end_date or period_end_date == "nan":
+        return value
     if period_end_date < "2022-12-31":
         return value * 1000
     return value
 ```
 
-(String comparison is safe here — `period_end_date` is always an ISO `YYYY-MM-DD` string in this codebase, which sorts identically to date comparison.)
+The `str()` coercion happens inside the function, not at each call site — the backfill script reads `period_end_date` back out of a CSV via pandas, which could in principle infer a non-string dtype, so every caller gets this protection for free rather than needing to remember it. The empty/missing guard matters for the same reason: an empty string sorts before `"2022-12-31"`, so without the guard a missing value would be wrongly scaled ×1000. No filing in the current archive is missing it, but the guard is one line and closes a real footgun.
 
-Both the scraper and the backfill script call this one function. No second implementation of the rule anywhere.
+(String comparison is otherwise safe here — a well-formed `period_end_date` is always an ISO `YYYY-MM-DD` string, which sorts identically to date comparison.)
 
-### 2. Scraper fix
+Every writer of 13F holdings data calls this one function, from a single choke point (Component 2) — no second implementation of the rule anywhere.
 
-In `scrapers/sec_edgar.py`'s `fetch_and_save_filings()`, inside the per-holding loop (currently around line 249-252):
+### 2. Scraper fix — normalize inside the shared fetch method, not at each call site
 
-```python
-                    # Add metadata to each holding row
-                    holding['portfolio_id'] = portfolio_id
-                    holding['filing_date'] = filing_date
-                    holding['period_end_date'] = period_end
-```
+**There are two writers of 13F holdings to CSV, not one:** `scrapers/sec_edgar.py`'s `fetch_and_save_filings()`, and a second, hand-rolled copy of the same metadata-attaching loop in `utils/fund_operations.py` (around lines 358-378, comment: "same logic as fetch_and_save_filings") — reachable from the dashboard's Admin page via `pull_latest_13fs_all_funds()`. Both call `SECEdgarScraper.get_13f_holdings(cik, accession_number)` directly and then attach `portfolio_id`/`filing_date`/`period_end_date` themselves. Fixing only `fetch_and_save_filings()` would leave the `fund_operations.py` path — and any future third caller — free to reintroduce the bug.
 
-add a call to normalize `value` right after `period_end_date` is set:
+The robust fix is to normalize inside `get_13f_holdings()` itself, since that's the one method both current call sites (and any future one) already go through to get holdings data at all. It currently has no `period_end_date` parameter — but both call sites already have `period_end`/`filing['report_date']` in scope at the point they call it, so threading it in is a small, natural change:
 
 ```python
-                    # Add metadata to each holding row
-                    holding['portfolio_id'] = portfolio_id
-                    holding['filing_date'] = filing_date
-                    holding['period_end_date'] = period_end
-                    holding['value'] = normalize_13f_value(holding['value'], period_end)
+def get_13f_holdings(self, cik: str, accession_number: str, period_end_date: str) -> list:
+    """Parse holdings from a 13F information table, with value normalized to whole dollars."""
+    ...
+    holdings = self._parse_info_table(response.text)
+    for holding in holdings:
+        holding['value'] = normalize_13f_value(holding['value'], period_end_date)
+    return holdings
 ```
 
-Also correct the stale comment at line 185 (`# Value already in correct scale`) — the raw XML value is only normalized after this point, not at parse time.
+(Both existing early-return paths — `return []` when the info table can't be found — are unaffected; there's nothing to normalize when there are no holdings.)
 
-This makes every future scrape — live incremental fetches or a from-scratch historical backfill — correct with no separate correction step.
+Update both call sites to pass the period end date they already have:
+- `scrapers/sec_edgar.py`'s `fetch_and_save_filings()`: `self.get_13f_holdings(cik, filing['accession_number'], period_end)`
+- `utils/fund_operations.py`'s new-filings loop: `scraper.get_13f_holdings(cik, filing['accession_number'], period_end)`
+
+Neither call site needs its own `normalize_13f_value()` call anymore — holdings come back already normalized. Each still separately sets `holding['period_end_date'] = period_end` afterward, unchanged.
+
+Also correct the stale comment at line 185 (`# Value already in correct scale`) — the raw XML value is only normalized in `get_13f_holdings()`, after `_parse_info_table()` returns, not at parse time.
+
+This makes every future scrape — through either call site, live incremental or a from-scratch historical backfill — correct with no separate correction step, and closes the door on a third caller reintroducing the bug.
 
 ### 3. One-time backfill script (`scripts/backfill_13f_value_scale.py`)
 
-Corrects the 31 already-scraped files for periods before 2022-12-31. Must be idempotent (safe to re-run) and must not risk permanent data loss on the gitignored, non-git-tracked `data/` directory.
+Corrects the 32 already-scraped files for periods before 2022-12-31. Must be idempotent (safe to re-run) and must not risk permanent data loss on the gitignored, non-git-tracked `data/` directory.
 
 **Design for idempotency and safety:**
 
-1. If `data/raw/13f_filings_backup/` does not already exist, create it and copy every file from `data/raw/13f_filings/` into it, unmodified. This snapshot is taken **once** — a re-run of the script never overwrites an existing backup, so the backup always reflects the true original raw data regardless of how many times the script runs.
-2. For every file in the **backup** (not the live directory — reading from the immutable snapshot every time is what makes this idempotent by construction: even a botched or repeated run always starts from the same untouched source, never from a previously-corrected file):
+1. If `data/raw/13f_filings_backup/` does not already exist: copy every file from `data/raw/13f_filings/` into a fresh temp directory (`data/raw/13f_filings_backup.tmp/`) first, then rename the temp directory to `13f_filings_backup/` only after every file has copied successfully. The rename is what makes this atomic — a crash or interruption partway through the copy leaves an orphaned `.tmp` directory and no `13f_filings_backup/`, so the next run starts the backup over from scratch rather than trusting a partial snapshot. Never treat a `.tmp` directory as a valid backup.
+2. This snapshot is taken **once**, from whatever files exist in `data/raw/13f_filings/` at the time the script first runs. A re-run never overwrites an existing (fully-renamed) backup, so the backup always reflects that original one-time state regardless of how many times the script runs afterward — but this also means any filing files added to the live directory *after* the first run are invisible to this script, since it iterates the backup, not the live directory. Acceptable for a one-time migration of the current archive; not a general-purpose repair tool.
+3. For every file in the **backup** (not the live directory — reading from the immutable snapshot every time is what makes correction idempotent by construction: even a repeated run always starts from the same untouched source, never from a previously-corrected file):
    - Load the CSV.
    - Apply `normalize_13f_value(row.value, row.period_end_date)` per row (per-row, not per-file — defensive, since the schema already carries `period_end_date` on every row and this doesn't assume all rows in a file share one period).
    - Write the result to the corresponding path in the **live** `data/raw/13f_filings/` directory, overwriting it.
-3. Print a per-file summary: filename, period_end_date, row count, whether it was rescaled, and old-vs-new total `value` sum.
+4. Print a per-file summary — filename, period_end_date, row count, whether it was rescaled, and old-vs-new total `value` sum — and **also write that same summary to a timestamped file under `docs/`** (e.g. `docs/13f_value_scale_backfill_<date>.log`), not stdout alone. This is a destructive rewrite of non-version-controlled data; a durable, committed audit trail of exactly what changed matters more here than it would for a script whose output is easy to reproduce or whose input is git-tracked.
 
 ### 4. Regenerate derived tables
 
-After the backfill completes, re-run the existing consolidation logic so the fix reaches the dashboard instead of leaving stale cached numbers behind:
+After the backfill completes, re-run `utils.data_processing.compute_and_save_qoq_changes("baker-bros")` to rebuild `data/processed/qoq_changes.csv`, which carries `value`, `prior_value`, and `value_delta_pct` derived from the raw files.
 
-- `scripts/consolidate_holdings.py` — rebuilds `data/processed/holdings.csv`.
-- `utils.data_processing.compute_and_save_qoq_changes("baker-bros")` — rebuilds `data/processed/qoq_changes.csv`.
+`scripts/consolidate_holdings.py` (`data/processed/holdings.csv`) does **not** need to be re-run: its actual output schema is `portfolio, ticker, cusip, shares, eod_date` — no value or price column at all, confirmed by inspection. That pipeline never reads 13F `value` (consistent with Component 1's Overview note that the Dashboard's price-based valuation is independent of this bug), so regenerating it would produce byte-identical output.
 
 ### 5. Verification
 
@@ -135,4 +143,4 @@ Replace with the accurate explanation (real SEC rule, exact boundary, and that i
 - Any change to how downstream code *uses* `value` (weight calculation, strategy selection, drift, the price-based Dashboard valuation pipeline) — all already correct or already scale-invariant.
 - Multi-fund support for the Dashboard page's missing fund selector (a separate, already-identified gap — not part of this fix).
 - Broader ticker-resolution-gap remediation (the 77%→8% missing-ticker trend over time) — a separate, larger project.
-- Adding a `value_scale` marker column to the CSV schema — once corrected, every file uniformly means "whole dollars," so a marker column would carry no information going forward. The one-time backfill's printed summary is the audit trail.
+- Adding a `value_scale` marker column to the CSV schema — once corrected, every file uniformly means "whole dollars," so a marker column would carry no information going forward. The one-time backfill's logged summary (Component 3) is the audit trail.
