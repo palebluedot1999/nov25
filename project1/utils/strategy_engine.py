@@ -17,6 +17,7 @@ Strategy rules:
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 import sys
@@ -32,9 +33,16 @@ from utils.holdings_operations import get_forward_filled_prices
 logger = logging.getLogger(__name__)
 
 PRICES_FILE = PROCESSED_DATA_DIR / "prices.csv"
-STRATEGY_1_POSITIONS_CSV    = PROCESSED_DATA_DIR / "strategy_1_positions.csv"
-STRATEGY_1_TRANSACTIONS_CSV = PROCESSED_DATA_DIR / "strategy_1_transactions.csv"
-STRATEGY_1_PERFORMANCE_CSV  = PROCESSED_DATA_DIR / "strategy_1_performance.csv"
+BACKTEST_RUNS_DIR = PROCESSED_DATA_DIR / "backtest_runs"
+BACKTEST_LOG_CSV = PROJECT_ROOT / "docs" / "backtest_log.csv"
+BACKTEST_LOG_COLUMNS = [
+    "run_id", "strategy", "monthly_contribution", "max_positions", "min_hold_months",
+    "trade_day", "hard_stop_return", "relative_bleed_return",
+    "relative_bleed_xbi_underperformance", "freeze_return_threshold", "portfolio_id",
+    "period_start", "period_end", "cumulative_invested", "ending_value",
+    "portfolio_return", "xbi_return", "vs_xbi_pp", "active_positions",
+    "sold_positions", "output_dir",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +289,55 @@ def _handle_filing_refresh(
 # ---------------------------------------------------------------------------
 # Main simulation
 # ---------------------------------------------------------------------------
+
+def _append_backtest_log(
+    run_id: str,
+    config: StrategyConfig,
+    performance_df: pd.DataFrame,
+    positions_df: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    """Append one summary row for this run to docs/backtest_log.csv.
+
+    Creates the file with a header row if it doesn't exist yet. No-ops if
+    performance_df has no data (e.g. cumulative_invested never went positive).
+    """
+    invested = performance_df[performance_df["cumulative_invested"] > 0]
+    if invested.empty:
+        return
+
+    first = invested.iloc[0]
+    last = performance_df.iloc[-1]
+
+    row = {
+        "run_id": run_id,
+        "strategy": "baker_bros_top10_ew",
+        "monthly_contribution": config.monthly_contribution,
+        "max_positions": config.max_positions,
+        "min_hold_months": config.min_hold_months,
+        "trade_day": config.trade_day,
+        "hard_stop_return": config.hard_stop_return,
+        "relative_bleed_return": config.relative_bleed_return,
+        "relative_bleed_xbi_underperformance": config.relative_bleed_xbi_underperformance,
+        "freeze_return_threshold": config.freeze_return_threshold,
+        "portfolio_id": config.portfolio_id,
+        "period_start": first["date"],
+        "period_end": last["date"],
+        "cumulative_invested": last["cumulative_invested"],
+        "ending_value": last["portfolio_value"],
+        "portfolio_return": round(last["portfolio_return"], 6),
+        "xbi_return": round(last["xbi_return"], 6),
+        "vs_xbi_pp": round((last["portfolio_return"] - last["xbi_return"]) * 100, 2),
+        "active_positions": int((positions_df["status"] == "active").sum()) if not positions_df.empty else 0,
+        "sold_positions": int((positions_df["status"] == "sold").sum()) if not positions_df.empty else 0,
+        "output_dir": str(output_dir.relative_to(PROJECT_ROOT)).replace("\\", "/"),
+    }
+
+    log_row_df = pd.DataFrame([row], columns=BACKTEST_LOG_COLUMNS)
+    write_header = not BACKTEST_LOG_CSV.exists()
+    BACKTEST_LOG_CSV.parent.mkdir(parents=True, exist_ok=True)
+    log_row_df.to_csv(BACKTEST_LOG_CSV, mode="a", header=write_header, index=False)
+
 
 def run_simulation(
     config: StrategyConfig | None = None,
@@ -536,14 +593,25 @@ def run_simulation(
     )
     performance_df = pd.DataFrame(daily_perf)
 
-    # Save CSVs
-    positions_df.to_csv(STRATEGY_1_POSITIONS_CSV, index=False)
-    transactions_df.to_csv(STRATEGY_1_TRANSACTIONS_CSV, index=False)
-    performance_df.to_csv(STRATEGY_1_PERFORMANCE_CSV, index=False)
+    # Save to a run-specific folder so results aren't overwritten by the next run
+    run_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    output_dir = BACKTEST_RUNS_DIR / run_id
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"  Positions:    {len(positions_df)} rows -> {STRATEGY_1_POSITIONS_CSV.name}")
-    print(f"  Transactions: {len(transactions_df)} rows -> {STRATEGY_1_TRANSACTIONS_CSV.name}")
-    print(f"  Performance:  {len(performance_df)} rows -> {STRATEGY_1_PERFORMANCE_CSV.name}")
+    positions_csv = output_dir / "positions.csv"
+    transactions_csv = output_dir / "transactions.csv"
+    performance_csv = output_dir / "performance.csv"
+
+    positions_df.to_csv(positions_csv, index=False)
+    transactions_df.to_csv(transactions_csv, index=False)
+    performance_df.to_csv(performance_csv, index=False)
+
+    print(f"  Positions:    {len(positions_df)} rows -> {positions_csv}")
+    print(f"  Transactions: {len(transactions_df)} rows -> {transactions_csv}")
+    print(f"  Performance:  {len(performance_df)} rows -> {performance_csv}")
+
+    _append_backtest_log(run_id, config, performance_df, positions_df, output_dir)
+    print(f"  Logged run {run_id} to {BACKTEST_LOG_CSV}")
 
     return positions_df, transactions_df, performance_df
 

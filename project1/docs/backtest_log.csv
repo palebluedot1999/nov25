@@ -1,0 +1,3 @@
+run_id,strategy,monthly_contribution,max_positions,min_hold_months,trade_day,hard_stop_return,relative_bleed_return,relative_bleed_xbi_underperformance,freeze_return_threshold,portfolio_id,period_start,period_end,cumulative_invested,ending_value,portfolio_return,xbi_return,vs_xbi_pp,active_positions,sold_positions,output_dir
+2026-09-07_203604,baker_bros_top10_ew,1000.0,10,3,1,-0.4,-0.25,-0.15,-0.1,baker-bros,2020-11-30,2026-02-06,63900.0,50973.27,-0.202296,0.32361,-52.59,10,9,data/processed/backtest_runs/2026-09-07_203604
+2026-09-07_203613,baker_bros_top10_ew,1000.0,10,3,1,-0.3,-0.25,-0.15,-0.1,baker-bros,2020-11-30,2026-02-06,63900.0,52101.86,-0.184634,0.32361,-50.82,10,9,data/processed/backtest_runs/2026-09-07_203613
