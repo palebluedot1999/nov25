@@ -7,7 +7,7 @@ See docs/superpowers/specs/2026-09-08-security-reference-data-design.md
 
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -165,13 +165,13 @@ def resolve_cusips(cusips, *, force: bool = False, sec_tickers=None, mapper=None
         if rec and rec.get("ticker"):
             new_rows.append({**{c: "" for c in _IDENTIFIER_COLS}, **rec,
                              "cusip": cusip, "source": "openfigi",
-                             "resolved_at": datetime.utcnow().isoformat()})
+                             "resolved_at": datetime.now(timezone.utc).isoformat()})
             continue
         m = _match_company_tickers(name, sec_index)
         if m:
             new_rows.append({**{c: "" for c in _IDENTIFIER_COLS}, **m,
                              "cusip": cusip, "source": "company_tickers",
-                             "resolved_at": datetime.utcnow().isoformat()})
+                             "resolved_at": datetime.now(timezone.utc).isoformat()})
 
     resolved = pd.DataFrame(new_rows, columns=_IDENTIFIER_COLS)
     if not resolved.empty:

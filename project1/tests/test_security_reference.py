@@ -107,7 +107,6 @@ class TestLookupFull:
             assert CUSIPMapper().lookup_full("999999999") is None
 
 
-from datetime import datetime
 from utils import security_reference as sr
 
 
