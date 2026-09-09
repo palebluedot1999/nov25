@@ -21,6 +21,22 @@ from config.settings import (
 from utils.cusip_mapping import cusip_to_ticker
 
 
+def normalize_13f_value(value: float, period_end_date: str) -> float:
+    """Normalize a 13F-reported value to whole dollars.
+
+    SEC's Form 13F amendment (effective for reporting periods ending
+    2022-12-31 and later) changed the required unit from thousands of
+    dollars to whole dollars. Filings for earlier periods must be
+    multiplied by 1000 to match; later filings are already correct.
+    """
+    period_end_date = str(period_end_date)
+    if not period_end_date or period_end_date == "nan":
+        return value
+    if period_end_date < "2022-12-31":
+        return value * 1000
+    return value
+
+
 class SECEdgarScraper:
     """Scraper for SEC EDGAR 13F filings."""
 
