@@ -25,6 +25,18 @@ python scripts/fetch_security_metadata.py
 streamlit run dashboard/app.py
 ```
 
+## Data migration order (run in this order after a fresh checkout or a filing re-scrape)
+1. `python scripts/backfill_13f_value_scale.py` — normalize pre-2022-12-31 13F `value`
+   to whole dollars (once per checkout, before any re-scrape; guarded against
+   double-application).
+2. `python scripts/build_security_reference.py` — build
+   `data/processed/security_reference.csv`. **Must precede step 4** — if `holdings.csv`
+   is regenerated before the reference exists, every ticker lands blank.
+3. `python scripts/fetch_all_prices.py` (or the background price fetch) — pull prices
+   for any newly-resolved tickers.
+4. `python scripts/consolidate_holdings.py` — regenerate `data/processed/holdings.csv`.
+5. Recompute `qoq_changes.csv` (Data Management → Compute QoQ, or the script).
+
 ## Key Files
 - `dashboard/app.py` - Main Streamlit app (run with `streamlit run dashboard/app.py`)
 - `scrapers/sec_edgar.py` - 13F filing scraper (outputs CSV)
@@ -148,7 +160,8 @@ pip install pytest pytest-cov
   `normalize_13f_value()` in `scrapers/sec_edgar.py`. Filings scraped under the old
   scraper (periods before 2022-12-31) are still in thousands and must be corrected
   once per checkout by running `python scripts/backfill_13f_value_scale.py` and then
-  regenerating `qoq_changes.csv`. Because `data/` is gitignored, each clone/worktree
+  regenerating `holdings.csv` (`python scripts/consolidate_holdings.py`) and
+  `qoq_changes.csv`. Because `data/` is gitignored, each clone/worktree
   has its own data copy and needs its own one-time run — done BEFORE any re-scrape on
   that checkout, never after (the fixed scraper already emits whole dollars, and the
   backfill would double-scale them; a sentinel file and a per-share sanity check guard

@@ -6,7 +6,6 @@ joins with price data, and calculates position values.
 """
 
 import pandas as pd
-import numpy as np
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 # File paths
 PROJECT_ROOT = Path(__file__).parent.parent
-CUSIP_CACHE_FILE = PROJECT_ROOT / "data" / "raw" / "cusip_cache.csv"
 FILINGS_DIR = PROJECT_ROOT / "data" / "raw" / "13f_filings"
 PRICES_FILE = PROJECT_ROOT / "data" / "processed" / "prices.csv"
 

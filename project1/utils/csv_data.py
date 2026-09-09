@@ -122,6 +122,9 @@ def load_latest_holdings(portfolio_id: str) -> pd.DataFrame:
     if df.empty:
         return df
 
+    if not df.empty:
+        df = enrich_holdings_with_reference(df)
+
     # Calculate weight
     total_value = df['value'].sum()
     if total_value > 0:

@@ -107,6 +107,35 @@ class TestLookupFull:
             assert CUSIPMapper().lookup_full("999999999") is None
 
 
+class TestLookupFullBatch:
+    def test_single_post_maps_results_by_position(self):
+        payload = [
+            {"data": [{"ticker": "ACME", "name": "ACME BIO INC", "figi": "BBG1",
+                       "compositeFIGI": "BBG2", "shareClassFIGI": "BBG3",
+                       "securityType": "Common Stock", "marketSector": "Equity",
+                       "exchCode": "US"}]},
+            {"warning": "no match"},
+            {"data": [{"ticker": "AAPL", "name": "APPLE INC", "figi": "BBG9",
+                       "compositeFIGI": "", "shareClassFIGI": "",
+                       "securityType": "Common Stock", "marketSector": "Equity",
+                       "exchCode": "US"}]},
+        ]
+        calls = []
+
+        def _fake_post(url, headers=None, json=None, timeout=None):
+            calls.append(json)
+            return _Resp(payload)
+
+        with patch("utils.cusip_mapping.requests.post", _fake_post):
+            out = CUSIPMapper().lookup_full_batch(["111111111", "222222222", "037833100"])
+
+        assert len(calls) == 1                                        # ONE batched request
+        assert [j["idValue"] for j in calls[0]] == ["111111111", "222222222", "037833100"]
+        assert out["111111111"]["ticker"] == "ACME"
+        assert out["037833100"]["ticker"] == "AAPL"
+        assert "222222222" not in out                                 # no-data CUSIP omitted
+
+
 from utils import security_reference as sr
 
 
@@ -115,6 +144,8 @@ class _FakeMapper:
         self.table = table
     def lookup_full(self, cusip):
         return self.table.get(cusip)
+    def lookup_full_batch(self, cusips):
+        return {c: self.table[c] for c in cusips if c in self.table}
 
 
 class TestResolveCusips:
@@ -132,6 +163,45 @@ class TestResolveCusips:
         row = out.set_index("cusip").loc["111111111"]
         assert row["ticker"] == "ACME"
         assert row["source"] == "openfigi"
+        assert (tmp_path / "ids.csv").exists()
+
+    def test_batches_openfigi_into_one_request(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sr, "SECURITY_IDENTIFIERS_FILE", tmp_path / "ids.csv")
+
+        calls = []
+
+        class _BatchSpy:
+            def lookup_full(self, cusip):
+                raise AssertionError("resolve_cusips must batch, not query per CUSIP")
+
+            def lookup_full_batch(self, cusips):
+                calls.append(list(cusips))
+                return {
+                    "111111111": {"ticker": "ACME", "name": "ACME BIO INC", "figi": "BBG1",
+                                  "composite_figi": "BBG2", "share_class_figi": "BBG3",
+                                  "security_type": "Common Stock", "market_sector": "Equity",
+                                  "exch_code": "US"},
+                    "037833100": {"ticker": "AAPL", "name": "APPLE INC", "figi": "BBG4",
+                                  "composite_figi": "", "share_class_figi": "",
+                                  "security_type": "Common Stock", "market_sector": "Equity",
+                                  "exch_code": "US"},
+                }
+
+        df = pd.DataFrame([
+            {"cusip": "111111111", "name": "Acme Bio Inc."},
+            {"cusip": "037833100", "name": "Apple Inc."},
+            {"cusip": "999999999", "name": "Totally Unknown Holdings"},
+        ])
+
+        out = sr.resolve_cusips(df, sec_tickers={}, mapper=_BatchSpy())
+
+        assert len(calls) == 1                                        # ONE batched request
+        assert set(calls[0]) == {"111111111", "037833100", "999999999"}
+        rows = out.set_index("cusip")
+        assert rows.loc["111111111", "ticker"] == "ACME"
+        assert rows.loc["111111111", "source"] == "openfigi"
+        assert rows.loc["037833100", "ticker"] == "AAPL"
+        assert "999999999" not in rows.index                          # unresolved not written
         assert (tmp_path / "ids.csv").exists()
 
     def test_name_match_fallback_captures_cik(self, tmp_path, monkeypatch):

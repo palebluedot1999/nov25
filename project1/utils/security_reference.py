@@ -136,7 +136,8 @@ def _match_company_tickers(name, sec_index, threshold: float = 0.90):
 
 def _load_identifiers() -> pd.DataFrame:
     if SECURITY_IDENTIFIERS_FILE.exists():
-        return pd.read_csv(SECURITY_IDENTIFIERS_FILE, dtype=str).fillna("")
+        df = pd.read_csv(SECURITY_IDENTIFIERS_FILE, dtype=str).fillna("")
+        return df.drop_duplicates(subset=["cusip"], keep="last")
     return pd.DataFrame(columns=_IDENTIFIER_COLS)
 
 
@@ -158,10 +159,15 @@ def resolve_cusips(cusips, *, force: bool = False, sec_tickers=None, mapper=None
     if not force:
         want = want[~want["cusip"].isin(set(existing["cusip"]))]
 
+    # One batched OpenFIGI request (chunked to 100 idValues internally) instead of
+    # one HTTP POST per CUSIP — spec §4/§10.
+    want_cusips = want["cusip"].tolist()
+    batch = mapper.lookup_full_batch(want_cusips) if want_cusips else {}
+
     new_rows = []
     for _, r in want.iterrows():
         cusip, name = r["cusip"], r.get("name", "")
-        rec = mapper.lookup_full(cusip)
+        rec = batch.get(cusip)
         if rec and rec.get("ticker"):
             new_rows.append({**{c: "" for c in _IDENTIFIER_COLS}, **rec,
                              "cusip": cusip, "source": "openfigi",

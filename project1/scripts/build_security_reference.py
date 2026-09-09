@@ -40,7 +40,7 @@ def main() -> None:
           f"{stats['name_only']} name_only, {stats['unresolved']} unresolved).")
 
     ref = load_security_reference()
-    worklist = ref[ref["resolution_status"].isin(["name_only", "unresolved"])]
+    worklist = ref[ref["resolution_status"].isin(["ticker_only", "name_only", "unresolved"])]
     report = project_root / "docs" / f"security_reference_coverage_{date.today()}.log"
     with report.open("w", encoding="utf-8") as fh:
         fh.write(f"Security reference coverage — {date.today()}\n")

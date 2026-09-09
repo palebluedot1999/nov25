@@ -191,26 +191,15 @@ class CUSIPMapper:
 
         return None
 
-    def lookup_full(self, cusip: str) -> Optional[Dict]:
-        """Full OpenFIGI record for one CUSIP (not just ticker). None if unmatched."""
-        if not cusip:
-            return None
-        cusip = cusip.strip().upper()
+    def _openfigi_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if OPENFIGI_API_KEY:
             headers["X-OPENFIGI-APIKEY"] = OPENFIGI_API_KEY
-        payload = [{"idType": "ID_CUSIP", "idValue": cusip, "exchCode": "US"}]
-        try:
-            resp = requests.post("https://api.openfigi.com/v3/mapping",
-                                 headers=headers, json=payload, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:  # noqa: BLE001
-            print(f"Warning: OpenFIGI lookup_full failed for {cusip}: {e}")
-            return None
-        if not data or "data" not in data[0] or not data[0]["data"]:
-            return None
-        d = data[0]["data"][0]
+        return headers
+
+    @staticmethod
+    def _map_openfigi_record(d: Dict) -> Dict:
+        """Map one OpenFIGI `data` entry to our identifier field names."""
         return {
             "ticker": d.get("ticker") or "",
             "name": d.get("name") or "",
@@ -221,6 +210,50 @@ class CUSIPMapper:
             "market_sector": d.get("marketSector") or "",
             "exch_code": d.get("exchCode") or "",
         }
+
+    def lookup_full(self, cusip: str) -> Optional[Dict]:
+        """Full OpenFIGI record for one CUSIP (not just ticker). None if unmatched."""
+        if not cusip:
+            return None
+        cusip = cusip.strip().upper()
+        payload = [{"idType": "ID_CUSIP", "idValue": cusip, "exchCode": "US"}]
+        try:
+            resp = requests.post("https://api.openfigi.com/v3/mapping",
+                                 headers=self._openfigi_headers(), json=payload, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:  # noqa: BLE001
+            print(f"Warning: OpenFIGI lookup_full failed for {cusip}: {e}")
+            return None
+        if not data or "data" not in data[0] or not data[0]["data"]:
+            return None
+        return self._map_openfigi_record(data[0]["data"][0])
+
+    def lookup_full_batch(self, cusips: list[str]) -> Dict[str, Dict]:
+        """Full OpenFIGI records for many CUSIPs, batching <=100 jobs per POST.
+
+        Returns {cusip: record dict}. CUSIPs with no OpenFIGI data are omitted.
+        OpenFIGI returns results in request order, so each response element maps
+        back to its CUSIP by list position.
+        """
+        clean = [str(c).strip().upper() for c in cusips if c and str(c).strip()]
+        out: Dict[str, Dict] = {}
+        for start in range(0, len(clean), 100):
+            chunk = clean[start:start + 100]
+            payload = [{"idType": "ID_CUSIP", "idValue": c, "exchCode": "US"} for c in chunk]
+            try:
+                resp = requests.post("https://api.openfigi.com/v3/mapping",
+                                     headers=self._openfigi_headers(), json=payload, timeout=30)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as e:  # noqa: BLE001
+                print(f"Warning: OpenFIGI lookup_full_batch failed for {len(chunk)} CUSIPs: {e}")
+                continue
+            for cusip, entry in zip(chunk, data or []):
+                if not isinstance(entry, dict) or not entry.get("data"):
+                    continue
+                out[cusip] = self._map_openfigi_record(entry["data"][0])
+        return out
 
     def bulk_lookup(self, cusips: list[str]) -> Dict[str, Optional[str]]:
         """
