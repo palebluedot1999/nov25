@@ -173,3 +173,56 @@ class TestResolveCusips:
 
         assert called == []          # cached CUSIP not re-queried
         assert out.empty
+
+
+class TestBuildSecurityReference:
+    def _setup(self, tmp_path, monkeypatch, identifiers_rows, overrides_text):
+        monkeypatch.setattr(sr, "SECURITY_REFERENCE_FILE", tmp_path / "security_reference.csv")
+        monkeypatch.setattr(sr, "SECURITY_IDENTIFIERS_FILE", tmp_path / "ids.csv")
+        monkeypatch.setattr(sr, "SECURITY_OVERRIDES_FILE", tmp_path / "security_overrides.csv")
+        pd.DataFrame(identifiers_rows, columns=sr._IDENTIFIER_COLS).to_csv(sr.SECURITY_IDENTIFIERS_FILE, index=False)
+        (tmp_path / "security_overrides.csv").write_text(overrides_text)
+        filings = tmp_path / "filings"
+        filings.mkdir()
+        _write_filing(
+            filings / "f1.csv",
+            [
+                {"company_name": "Acme Bio Inc.", "cusip": "111111111", "ticker": "", "value": 1, "shares": 1},
+                {"company_name": "Bond Co", "cusip": "00484MAA4", "ticker": "", "value": 1, "shares": 1},
+                {"company_name": "Ghost Inc", "cusip": "222222222", "ticker": "", "value": 1, "shares": 1},
+            ],
+            "2024-05-15", "2024-03-31",
+        )
+        monkeypatch.setattr(sr, "FILINGS_DIR", filings)
+
+    def test_precedence_and_status(self, tmp_path, monkeypatch):
+        ids = [
+            {**{c: "" for c in sr._IDENTIFIER_COLS}, "cusip": "111111111", "ticker": "WRONG",
+             "name": "ACME BIO INC", "figi": "BBG1", "source": "openfigi", "resolved_at": "x"},
+            {**{c: "" for c in sr._IDENTIFIER_COLS}, "cusip": "00484MAA4", "ticker": "BONDX",
+             "name": "BOND CO", "figi": "BBG9", "source": "openfigi", "resolved_at": "x"},
+        ]
+        overrides = (
+            "# cusip,ticker,name,security_type,cik,note\n"
+            "cusip,ticker,name,security_type,cik,note\n"
+            "111111111,ACME,Acme Bio Inc.,Common Stock,,corrected\n"
+            "00484MAA4,,Bond Co,Corp Bond,,no tradable ticker\n"
+        )
+        self._setup(tmp_path, monkeypatch, ids, overrides)
+
+        stats = sr.build_security_reference()
+        ref = sr.load_security_reference().set_index("cusip")
+
+        # override beats openfigi
+        assert ref.loc["111111111", "ticker"] == "ACME"
+        assert ref.loc["111111111", "resolution_source"] == "override"
+        assert ref.loc["111111111", "resolution_status"] == "ticker_only"
+        assert ref.loc["111111111", "isin"] == "US1111111118"
+        # suppression: blank-ticker override beats a confident openfigi hit
+        assert ref.loc["00484MAA4", "ticker"] == ""
+        assert ref.loc["00484MAA4", "resolution_status"] == "name_only"
+        # CINS-safe / unresolved
+        assert ref.loc["222222222", "resolution_status"] == "unresolved"
+        assert ref.loc["222222222", "ticker"] == ""
+        assert stats["total"] == 3
+        assert stats["unresolved"] == 1

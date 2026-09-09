@@ -180,3 +180,106 @@ def resolve_cusips(cusips, *, force: bool = False, sec_tickers=None, mapper=None
         SECURITY_IDENTIFIERS_FILE.parent.mkdir(parents=True, exist_ok=True)
         combined.to_csv(SECURITY_IDENTIFIERS_FILE, index=False)
     return resolved
+
+
+_OVERRIDE_COLS = ["cusip", "ticker", "name", "security_type", "cik", "note"]
+_REFERENCE_COLS = ["cusip", "ticker", "name", "cik", "isin", "figi", "composite_figi",
+                   "share_class_figi", "security_type", "market_sector", "exch_code",
+                   "is_active", "first_seen_quarter", "last_seen_quarter", "n_filings",
+                   "resolution_source", "resolution_status", "built_at"]
+
+
+def _load_overrides() -> pd.DataFrame:
+    if not SECURITY_OVERRIDES_FILE.exists():
+        return pd.DataFrame(columns=_OVERRIDE_COLS)
+    df = pd.read_csv(SECURITY_OVERRIDES_FILE, dtype=str, comment="#").fillna("")
+    for c in _OVERRIDE_COLS:
+        if c not in df.columns:
+            df[c] = ""
+    df["cusip"] = df["cusip"].str.strip().str.upper()
+    return df[df["cusip"] != ""]
+
+
+def load_security_reference() -> pd.DataFrame:
+    if SECURITY_REFERENCE_FILE.exists():
+        return pd.read_csv(SECURITY_REFERENCE_FILE, dtype=str).fillna("")
+    return pd.DataFrame(columns=_REFERENCE_COLS)
+
+
+def _status(ticker: str, figi: str, source: str, suppressed: bool) -> str:
+    if suppressed:
+        return "name_only"
+    if ticker and figi:
+        return "resolved"
+    if ticker:
+        return "ticker_only"
+    if source == "company_tickers":
+        return "name_only"
+    return "unresolved"
+
+
+def build_security_reference() -> dict:
+    sweep = collect_filing_cusips(FILINGS_DIR).set_index("cusip")
+    ids = _load_identifiers().set_index("cusip")
+    ovr = _load_overrides().set_index("cusip")
+
+    rows = []
+    for cusip, s in sweep.iterrows():
+        idr = ids.loc[cusip].to_dict() if cusip in ids.index else {}
+        ov = ovr.loc[cusip].to_dict() if cusip in ovr.index else {}
+        suppressed = bool(ov) and ov.get("ticker", "") == ""
+
+        if ov and not suppressed:
+            source = "override"
+            ticker = ov.get("ticker", "")
+            name = ov.get("name") or idr.get("name") or s["name"]
+        elif suppressed:
+            source = "override"
+            ticker = ""
+            name = ov.get("name") or idr.get("name") or s["name"]
+        elif idr.get("ticker"):
+            source = idr.get("source", "openfigi")
+            ticker = idr["ticker"]
+            name = idr.get("name") or s["name"]
+        elif idr.get("source") == "company_tickers":
+            source = "company_tickers"
+            ticker = ""
+            name = idr.get("name") or s["name"]
+        else:
+            source = "filing"
+            ticker = s["ticker_in_filing"]
+            name = s["name"]
+
+        figi = "" if source == "override" or suppressed else idr.get("figi", "")
+        sec_type = ov.get("security_type") or idr.get("security_type", "")
+        rows.append({
+            "cusip": cusip, "ticker": ticker, "name": name,
+            "cik": ov.get("cik") or idr.get("cik", ""),
+            "isin": cusip_to_isin(cusip),
+            "figi": figi,
+            "composite_figi": "" if source == "override" else idr.get("composite_figi", ""),
+            "share_class_figi": "" if source == "override" else idr.get("share_class_figi", ""),
+            "security_type": sec_type,
+            "market_sector": idr.get("market_sector", ""),
+            "exch_code": idr.get("exch_code", ""),
+            "is_active": bool(s["is_active"]),
+            "first_seen_quarter": s["first_seen_quarter"],
+            "last_seen_quarter": s["last_seen_quarter"],
+            "n_filings": int(s["n_filings"]),
+            "resolution_source": source,
+            "resolution_status": _status(ticker, figi, source, suppressed),
+            "built_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    ref = pd.DataFrame(rows, columns=_REFERENCE_COLS)
+    SECURITY_REFERENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ref.to_csv(SECURITY_REFERENCE_FILE, index=False)
+    vc = ref["resolution_status"].value_counts().to_dict()
+    return {
+        "total": len(ref),
+        "resolved": vc.get("resolved", 0) + vc.get("ticker_only", 0),
+        "ticker_only": vc.get("ticker_only", 0),
+        "name_only": vc.get("name_only", 0),
+        "unresolved": vc.get("unresolved", 0),
+        "path": str(SECURITY_REFERENCE_FILE),
+    }
