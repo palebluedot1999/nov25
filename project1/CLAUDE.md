@@ -45,8 +45,12 @@ streamlit run dashboard/app.py
 - `scripts/consolidate_securities.py` - Merge CUSIP cache + metadata into securities.csv
 - `scripts/consolidate_holdings.py` - Process quarterly 13F filings into daily holdings table
 - `scripts/backfill_13f_value_scale.py` - One-time migration: normalizes pre-2022-12-31 13F `value` from thousands to whole dollars. Run once per checkout, BEFORE any re-scrape; guarded against double-application.
-- `data/portfolios.csv` - Portfolio definitions
-- `data/holdings/*.csv` - Historical quarterly holdings (one per filing)
+- `utils/security_reference.py` - Sweep 13F CUSIPs, resolve identifiers (OpenFIGI + SEC company_tickers name-match), build the master security_reference.csv; `enrich_holdings_with_reference()` fills tickers/names everywhere
+- `scripts/build_security_reference.py` - Build data/processed/security_reference.csv + a coverage report (flags: --force, --no-api)
+- `config/security_overrides.csv` - Committed manual CUSIP->identifier overrides / suppressions
+- `data/processed/security_reference.csv` - Master security reference: one row per CUSIP ever held, with identifiers + provenance + filing history
+- `data/raw/portfolios.csv` - Portfolio definitions
+- `data/raw/13f_filings/*.csv` - Historical quarterly 13F filings (one per filing)
 
 ## Design Decisions
 - **CSV-only storage**: Simplified architecture, no database overhead
@@ -54,6 +58,9 @@ streamlit run dashboard/app.py
 - **Positions tab shows latest filing**: Most recent CSV by filing date
 - **Quarterly filing data used as cost basis for P&L**
 - **Data fetched on-demand when dashboard loads** (no background scheduler)
+
+## Data Platform
+Raw inputs live in `data/raw/`, derived tables in `data/processed/` (all gitignored; `config/security_overrides.csv` is the one committed data-shaped file). Full schema catalogue: `docs/superpowers/specs/2026-09-08-security-reference-data-design.md` §3.
 
 ## Strategies
 
@@ -67,7 +74,7 @@ The strategy/backtest system (`strategies/`, `utils/strategy_registry.py`, `util
 - **Security metadata enrichment** - 31 fundamental fields (sector, industry, financials, ratios)
 - **Price consolidation** into master prices.csv table (188K+ records)
 - CSV data layer with all operations (portfolios, holdings, prices)
-- **Dashboard pages (8 total)**: Overview (1), Fund Tracking (2), P&L Analysis (3), Tracking Error (4), Calendar (5), Data Management (6), Portfolio Size (7), Prices (8)
+- **Dashboard pages**: `1_Dashboard, 2_Trades, 3_Research, 4_Signals, 5_Admin`
 - **Prices page**: Bloomberg dark-theme interactive price chart (`8_Prices.py`); dark CSS injected via `st.markdown()` — the established pattern for themed pages
 - **Top 10 Holdings Weight Over Time** chart on Overview page
 - Historical holdings view (20 quarters of Baker Bros data)
