@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 import pytest
 
+from utils import csv_data
 from utils import holdings_operations as ho
 from utils import security_reference as sr
 
@@ -115,3 +116,23 @@ def test_save_processed_holdings_roundtrips_blank_tickers(tmp_path):
     assert list(back.columns) == ["portfolio", "cusip", "ticker", "shares", "filing_value", "eod_date"]
     # blank ticker sorts first lexically when eod_date ties (categorical sort, no error)
     assert back["ticker"].tolist() == ["", "ACME"]
+
+
+def test_load_holdings_by_date_enriches_blank_ticker(tmp_path, monkeypatch):
+    hd = tmp_path / "baker-bros_2025-02-14_holdings.csv"
+    _filing(hd, [
+        {"company_name": "Ghost Inc", "cusip": "999999999", "ticker": "", "value": 40.0, "shares": 4},
+        {"company_name": "Acme Bio Inc.", "cusip": "111111111", "ticker": "", "value": 100.0, "shares": 10},
+    ], "2025-02-14", "2024-12-31")
+    monkeypatch.setattr(csv_data, "HOLDINGS_DIR", tmp_path)
+    ref = tmp_path / "ref.csv"
+    pd.DataFrame([
+        {**{c: "" for c in sr._REFERENCE_COLS}, "cusip": "111111111", "ticker": "ACME",
+         "name": "Acme Bio Inc.", "resolution_status": "resolved"},
+    ]).to_csv(ref, index=False)
+    monkeypatch.setattr(sr, "SECURITY_REFERENCE_FILE", ref)
+
+    out = csv_data.load_holdings_by_date("baker-bros", "2025-02-14").set_index("cusip")
+    assert out.loc["111111111", "ticker"] == "ACME"
+    assert out.loc["999999999", "ticker"] == ""
+    assert out.loc["999999999", "resolution_status"] == "unresolved"
