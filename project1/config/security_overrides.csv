@@ -9,3 +9,12 @@
 #     hit. Use for recycled / delisted CUSIPs with no tradable ticker.
 #
 cusip,ticker,name,security_type,cik,note
+22663K107,CRNX,"Crinetics Pharmaceuticals, Inc.",Common Stock,,filing ticker column carries CRNX in all 23 filings; Nasdaq CRNX
+83086J200,SKYE,"Skye Bioscience, Inc.",Common Stock,,filing ticker column carries SKYE in all 8 filings; Nasdaq SKYE (post reverse split)
+G01767105,ALKS,Alkermes plc,Common Stock,,well-known active holding; Nasdaq ALKS
+G52694109,KNSA,"Kiniksa Pharmaceuticals International, plc",Common Stock,,well-known active holding; Nasdaq KNSA
+G76279101,ROIV,Roivant Sciences Ltd.,Common Stock,,well-known active holding; Nasdaq ROIV
+N44445109,IMTX,Immatics N.V.,Common Stock,,well-known active holding; Nasdaq IMTX
+N69605108,PHVS,Pharvaris N.V.,Common Stock,,well-known active holding; Nasdaq PHVS
+Y95308105,WVE,Wave Life Sciences Ltd.,Common Stock,,well-known active holding; Nasdaq WVE
+15102KAA8,,Celcuity Inc.,Note,,convertible note (CUSIP 6+2+1 debt format; filing marks 30.75M principal near 133 of par) - no equity ticker; common stock is 15102K107
