@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
 import logging
 
+from utils.security_reference import enrich_holdings_with_reference
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,54 +25,18 @@ FILINGS_DIR = PROJECT_ROOT / "data" / "raw" / "13f_filings"
 PRICES_FILE = PROJECT_ROOT / "data" / "processed" / "prices.csv"
 
 
-def resolve_tickers_from_cusip_cache(holdings_df: pd.DataFrame) -> pd.DataFrame:
+def resolve_tickers_from_reference(holdings_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Resolve missing tickers from CUSIP cache.
+    Fill blank tickers and add name/resolution_status from security_reference.csv.
 
     Args:
         holdings_df: DataFrame with 'ticker' and 'cusip' columns
 
     Returns:
-        DataFrame with resolved tickers (empty tickers filled where possible)
+        DataFrame with blank tickers filled where possible (blank ticker stays "",
+        never NaN) plus 'name' and 'resolution_status' columns.
     """
-    # Load CUSIP cache
-    if not CUSIP_CACHE_FILE.exists():
-        logger.warning(f"CUSIP cache not found at {CUSIP_CACHE_FILE}")
-        return holdings_df
-
-    cusip_cache = pd.read_csv(CUSIP_CACHE_FILE)
-
-    # Count missing tickers before resolution
-    missing_before = holdings_df['ticker'].isna().sum() + (holdings_df['ticker'] == '').sum()
-
-    # Create a copy to avoid modifying original
-    df = holdings_df.copy()
-
-    # Fill empty strings with NaN for consistency
-    df.loc[df['ticker'] == '', 'ticker'] = np.nan
-
-    # Left join to fill missing tickers
-    # Only update rows where ticker is missing
-    missing_mask = df['ticker'].isna()
-    if missing_mask.any():
-        df.loc[missing_mask, 'ticker'] = df.loc[missing_mask].merge(
-            cusip_cache[['cusip', 'ticker']],
-            on='cusip',
-            how='left',
-            suffixes=('', '_new')
-        )['ticker_new']
-
-    # Count missing tickers after resolution
-    missing_after = df['ticker'].isna().sum()
-    resolved_count = missing_before - missing_after
-
-    if resolved_count > 0:
-        logger.info(f"Resolved {resolved_count} tickers from CUSIP cache")
-    if missing_after > 0:
-        unresolved_cusips = df[df['ticker'].isna()]['cusip'].unique()
-        logger.warning(f"{missing_after} tickers still unresolved. CUSIPs: {unresolved_cusips[:5]}...")
-
-    return df
+    return enrich_holdings_with_reference(holdings_df)
 
 
 def detect_position_exits(current_filing_df: pd.DataFrame, next_filing_df: pd.DataFrame) -> List[str]:
@@ -82,17 +48,17 @@ def detect_position_exits(current_filing_df: pd.DataFrame, next_filing_df: pd.Da
         next_filing_df: Holdings from filing N+1
 
     Returns:
-        List of tickers that appear in current but not in next filing
+        List of CUSIPs that appear in current but not in next filing
     """
-    current_tickers = set(current_filing_df['ticker'].dropna())
-    next_tickers = set(next_filing_df['ticker'].dropna())
+    current_cusips = set(current_filing_df['cusip'].dropna())
+    next_cusips = set(next_filing_df['cusip'].dropna())
 
-    exited_tickers = current_tickers - next_tickers
+    exited_cusips = current_cusips - next_cusips
 
-    if exited_tickers:
-        logger.info(f"Detected {len(exited_tickers)} position exits: {sorted(exited_tickers)[:10]}...")
+    if exited_cusips:
+        logger.info(f"Detected {len(exited_cusips)} position exits: {sorted(exited_cusips)[:10]}...")
 
-    return list(exited_tickers)
+    return list(exited_cusips)
 
 
 def process_quarterly_filings_to_daily_holdings(
@@ -107,7 +73,8 @@ def process_quarterly_filings_to_daily_holdings(
     1. Load all 13F filing CSVs for portfolio
     2. Sort by period_end_date ascending
     3. For each filing:
-        - Resolve missing tickers from cusip_cache
+        - Fill blank tickers from security_reference.csv (positions with no
+          ticker are still kept, keyed by CUSIP)
         - Determine date range (period_end → next_period_end - 1 day)
         - Create daily records for all dates in range
         - For positions that exited: add shares=0 record on next period_end
@@ -119,7 +86,7 @@ def process_quarterly_filings_to_daily_holdings(
         end_date: End date for holdings (defaults to today)
 
     Returns:
-        DataFrame with columns: portfolio, ticker, cusip, shares, eod_date
+        DataFrame with columns: portfolio, cusip, ticker, shares, filing_value, eod_date
     """
     logger.info(f"Processing {portfolio_id} filings to daily holdings...")
 
@@ -139,7 +106,7 @@ def process_quarterly_filings_to_daily_holdings(
     filings = []
     for file in filing_files:
         df = pd.read_csv(file)
-        df = resolve_tickers_from_cusip_cache(df)
+        df = resolve_tickers_from_reference(df)
         filings.append(df)
 
     # Sort by period_end_date
@@ -171,12 +138,12 @@ def process_quarterly_filings_to_daily_holdings(
         logger.info(f"Filing {i+1}/{len(filings)}: {period_end} (filing_date: {filing_date})")
         logger.info(f"  Forward-filling {len(filing_df)} positions from {range_start} to {range_end}")
 
-        # Filter to valid tickers only (skip unresolved)
-        valid_holdings = filing_df[filing_df['ticker'].notna()].copy()
-
-        if len(valid_holdings) < len(filing_df):
-            skipped = len(filing_df) - len(valid_holdings)
-            logger.warning(f"  Skipping {skipped} positions with unresolved tickers")
+        # Keep every position; unresolved ones carry a blank ticker + their filing value.
+        valid_holdings = filing_df.copy()
+        valid_holdings['ticker'] = valid_holdings['ticker'].fillna('').astype(str)
+        unresolved = int((valid_holdings['ticker'] == '').sum())
+        if unresolved:
+            logger.info(f"  {unresolved} positions have no ticker yet (kept, keyed by CUSIP)")
 
         # Create date range
         date_range = pd.date_range(start=range_start, end=range_end, freq='D')
@@ -189,6 +156,7 @@ def process_quarterly_filings_to_daily_holdings(
                 'ticker': row['ticker'],
                 'cusip': row['cusip'],
                 'shares': row['shares'],
+                'filing_value': row['value'],
                 'eod_date': date_range
             })
             daily_records.append(ticker_df)
@@ -200,22 +168,20 @@ def process_quarterly_filings_to_daily_holdings(
         # Detect position exits and add shares=0 records on next period_end
         if i < len(filings) - 1:
             next_filing_df = filings[i + 1]
-            exited_tickers = detect_position_exits(valid_holdings, next_filing_df)
+            exited_cusips = detect_position_exits(valid_holdings, next_filing_df)
 
-            if exited_tickers:
+            if exited_cusips:
                 next_period_end = next_filing_df['period_end_date'].iloc[0]
 
                 # Create shares=0 records for exited positions
                 exit_records = []
-                for ticker in exited_tickers:
-                    # Get CUSIP for this ticker from current filing
-                    cusip = valid_holdings[valid_holdings['ticker'] == ticker]['cusip'].iloc[0]
-
+                for exited_cusip in exited_cusips:
                     exit_df = pd.DataFrame({
                         'portfolio': [portfolio_id],
-                        'ticker': [ticker],
-                        'cusip': [cusip],
+                        'ticker': [''],
+                        'cusip': [exited_cusip],
                         'shares': [0.0],
+                        'filing_value': [0.0],
                         'eod_date': [pd.to_datetime(next_period_end)]
                     })
                     exit_records.append(exit_df)
