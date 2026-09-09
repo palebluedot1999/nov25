@@ -125,6 +125,14 @@ try:
         ff_prices = get_forward_filled_prices(str(start.date()), str(end.date()))
         port_values = calculate_portfolio_values(holdings_hist, ff_prices)
 
+        unpriced = port_values[~port_values["has_price"]]
+        if not unpriced.empty:
+            latest = port_values["eod_date"].max()
+            gap = unpriced.loc[unpriced["eod_date"] == latest, "filing_value"].sum()
+            n = unpriced.loc[unpriced["eod_date"] == latest, "cusip"].nunique()
+            st.caption(f"{n} positions unpriced on {latest} — ${gap:,.0f} by last 13F value "
+                       f"(excluded from the priced total below).")
+
         if port_view == "Chart":
             daily_total = port_values.groupby("eod_date")["position_value"].sum().reset_index()
             daily_total.columns = ["date", "value"]
