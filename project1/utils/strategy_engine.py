@@ -119,14 +119,9 @@ def _select_top_holdings(holdings_df: pd.DataFrame, n: int) -> pd.DataFrame:
     column is present; ``.get(..., "resolved")`` keeps this sane if an un-enriched
     frame is ever passed.
     """
-    df = holdings_df[
-        (holdings_df.get("resolution_status", "resolved") == "resolved")
-        & (holdings_df["value"] > 0)
-    ].copy()
-
-    if df.empty:
-        return pd.DataFrame(columns=["ticker", "company_name", "weight_pct"])
-
+    # Log names dropped by the resolution_status gate that would have passed the
+    # old `ticker != ""` test. Computed from holdings_df (always available) BEFORE
+    # the df.empty early return, so it still fires when the gate drops everything.
     dropped = holdings_df[
         (holdings_df["value"] > 0)
         & (holdings_df["ticker"].fillna("").astype(str) != "")
@@ -135,6 +130,14 @@ def _select_top_holdings(holdings_df: pd.DataFrame, n: int) -> pd.DataFrame:
     if not dropped.empty:
         logger.info("Top-N: excluded %d non-resolved names: %s",
                     len(dropped), sorted(dropped["ticker"].astype(str).unique())[:10])
+
+    df = holdings_df[
+        (holdings_df.get("resolution_status", "resolved") == "resolved")
+        & (holdings_df["value"] > 0)
+    ].copy()
+
+    if df.empty:
+        return pd.DataFrame(columns=["ticker", "company_name", "weight_pct"])
 
     df["weight_pct"] = df["value"] / df["value"].sum() * 100
     df = df.nlargest(n, "weight_pct")
