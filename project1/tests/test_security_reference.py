@@ -71,3 +71,37 @@ class TestCollectFilingCusips:
         assert bool(out.loc["111111111", "is_active"]) is True
         assert bool(out.loc["222222222", "is_active"]) is False     # absent from latest filing
         assert out.loc["222222222", "n_filings"] == 1
+
+
+from unittest.mock import patch
+from utils.cusip_mapping import CUSIPMapper
+
+
+class _Resp:
+    def __init__(self, payload):
+        self._payload = payload
+    def raise_for_status(self):
+        pass
+    def json(self):
+        return self._payload
+
+
+class TestLookupFull:
+    def test_maps_openfigi_fields(self):
+        payload = [{"data": [{
+            "ticker": "ACME", "name": "ACME BIO INC",
+            "figi": "BBG000000001", "compositeFIGI": "BBG000000002",
+            "shareClassFIGI": "BBG000000003", "securityType": "Common Stock",
+            "marketSector": "Equity", "exchCode": "US",
+        }]}]
+        with patch("utils.cusip_mapping.requests.post", return_value=_Resp(payload)):
+            rec = CUSIPMapper().lookup_full("111111111")
+        assert rec == {
+            "ticker": "ACME", "name": "ACME BIO INC", "figi": "BBG000000001",
+            "composite_figi": "BBG000000002", "share_class_figi": "BBG000000003",
+            "security_type": "Common Stock", "market_sector": "Equity", "exch_code": "US",
+        }
+
+    def test_no_data_returns_none(self):
+        with patch("utils.cusip_mapping.requests.post", return_value=_Resp([{"warning": "no match"}])):
+            assert CUSIPMapper().lookup_full("999999999") is None

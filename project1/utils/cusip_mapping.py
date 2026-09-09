@@ -191,6 +191,37 @@ class CUSIPMapper:
 
         return None
 
+    def lookup_full(self, cusip: str) -> Optional[Dict]:
+        """Full OpenFIGI record for one CUSIP (not just ticker). None if unmatched."""
+        if not cusip:
+            return None
+        cusip = cusip.strip().upper()
+        headers = {"Content-Type": "application/json"}
+        if OPENFIGI_API_KEY:
+            headers["X-OPENFIGI-APIKEY"] = OPENFIGI_API_KEY
+        payload = [{"idType": "ID_CUSIP", "idValue": cusip, "exchCode": "US"}]
+        try:
+            resp = requests.post("https://api.openfigi.com/v3/mapping",
+                                 headers=headers, json=payload, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:  # noqa: BLE001
+            print(f"Warning: OpenFIGI lookup_full failed for {cusip}: {e}")
+            return None
+        if not data or "data" not in data[0] or not data[0]["data"]:
+            return None
+        d = data[0]["data"][0]
+        return {
+            "ticker": d.get("ticker") or "",
+            "name": d.get("name") or "",
+            "figi": d.get("figi") or "",
+            "composite_figi": d.get("compositeFIGI") or "",
+            "share_class_figi": d.get("shareClassFIGI") or "",
+            "security_type": d.get("securityType") or d.get("securityType2") or "",
+            "market_sector": d.get("marketSector") or "",
+            "exch_code": d.get("exchCode") or "",
+        }
+
     def bulk_lookup(self, cusips: list[str]) -> Dict[str, Optional[str]]:
         """
         Lookup multiple CUSIPs at once.
