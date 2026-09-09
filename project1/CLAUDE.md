@@ -135,10 +135,12 @@ pip install pytest pytest-cov
 ## Notes
 - SEC requires User-Agent with contact email (configured in settings.py)
 - 13F filings are quarterly, ~45 days after quarter end
-- Values in 13F are reported in thousands (scraper multiplies by 1000)
-  - **Note**: Early filings (2020-2022 Q3) have unscaled values (in thousands)
-  - Later filings (2022 Q4+) have scaled values (in dollars)
-  - This inconsistency occurred when SEC scraper was updated but old files weren't regenerated
+- 13F values are in whole dollars. SEC's Form 13F amendment (effective for reporting
+  periods ending 2022-12-31 and later) changed the required unit from thousands of
+  dollars to whole dollars; filings for earlier periods were originally scraped in
+  thousands and have been corrected via a one-time backfill (see
+  scrapers/sec_edgar.py's normalize_13f_value()). New scrapes are normalized at
+  ingestion time, so this should never need correcting again.
 - OpenFIGI API key is optional but recommended (set `OPENFIGI_API_KEY` env var)
 - CUSIP cache auto-builds from 13F filings and can be viewed/edited in Data Management page
 - Portfolio size calculations use forward-filled prices (weekends/holidays use last trading day price)
