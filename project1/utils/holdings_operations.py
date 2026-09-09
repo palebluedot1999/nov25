@@ -301,12 +301,18 @@ def calculate_portfolio_values(
 
     Formula: position_value = shares × close_price
 
+    Uses a LEFT join on [ticker, eod_date] so unpriced positions (price gaps,
+    blank tickers) are kept rather than dropped. A boolean `has_price` column
+    flags which rows matched a price; `position_value` is NaN where no close.
+
     Args:
-        holdings_df: DataFrame with columns: portfolio, ticker, cusip, shares, eod_date
+        holdings_df: DataFrame with columns: portfolio, cusip, ticker, shares,
+            filing_value, eod_date
         prices_df: DataFrame with columns: ticker, date, close
 
     Returns:
-        DataFrame with columns: eod_date, ticker, shares, close, position_value
+        DataFrame with columns: eod_date, cusip, ticker, shares, filing_value,
+        close, has_price, position_value. Rows are never dropped.
     """
     logger.info("Calculating position values...")
 
@@ -316,27 +322,23 @@ def calculate_portfolio_values(
         prices_df,
         left_on=['ticker', 'eod_date'],
         right_on=['ticker', 'date'],
-        how='inner'
+        how='left',
     )
 
-    # Calculate position value
-    merged['position_value'] = merged['shares'] * merged['close']
+    merged['has_price'] = merged['close'].notna()
+    merged['position_value'] = merged['shares'] * merged['close']   # NaN where no close
 
-    # Check for missing price data
-    total_holdings = len(holdings_df)
-    matched_holdings = len(merged)
-    missing_pct = (total_holdings - matched_holdings) / total_holdings * 100
-
-    if missing_pct > 5:
-        logger.warning(f"Missing price data for {missing_pct:.1f}% of holdings")
+    total = len(holdings_df)
+    unpriced = int((~merged['has_price']).sum())
+    if total and (unpriced / total * 100) > 5:
+        logger.warning(f"{unpriced} position-days unpriced (kept, position_value=NaN)")
 
     logger.info(f"Calculated {len(merged):,} position values")
-    logger.info(f"  Holdings with prices: {matched_holdings:,} / {total_holdings:,} ({100-missing_pct:.1f}%)")
+    logger.info(f"  Holdings with prices: {total - unpriced:,} / {total:,}")
 
-    # Return relevant columns
-    result = merged[['eod_date', 'ticker', 'cusip', 'shares', 'close', 'position_value']].copy()
-
-    return result
+    cols = ['eod_date', 'cusip', 'ticker', 'shares', 'filing_value', 'close',
+            'has_price', 'position_value']
+    return merged[[c for c in cols if c in merged.columns]].copy()
 
 
 def save_processed_holdings(holdings_df: pd.DataFrame, output_file: Path) -> None:
@@ -347,6 +349,11 @@ def save_processed_holdings(holdings_df: pd.DataFrame, output_file: Path) -> Non
     - Convert ticker to categorical dtype (reduces memory)
     - Sort by eod_date, ticker for efficient queries
     - Add metadata comment to file header
+
+    Persisted columns (exactly, in this order): portfolio, cusip, ticker,
+    shares, filing_value, eod_date. The file stays PRICE-FREE — has_price /
+    close / position_value are produced by calculate_portfolio_values at
+    consume time and never persisted. Blank ticker is written as '' never NaN.
 
     Args:
         holdings_df: DataFrame to save
@@ -359,6 +366,13 @@ def save_processed_holdings(holdings_df: pd.DataFrame, output_file: Path) -> Non
 
     # Optimize data types
     df = holdings_df.copy()
+    df['ticker'] = df['ticker'].fillna('').astype(str)
+    assert not df['ticker'].isna().any(), "blank ticker must be '' not NaN"
+
+    # Enforce the spec column order regardless of caller's column order.
+    keep = ['portfolio', 'cusip', 'ticker', 'shares', 'filing_value', 'eod_date']
+    df = df[keep]
+
     df['ticker'] = df['ticker'].astype('category')
     df['portfolio'] = df['portfolio'].astype('category')
 

@@ -76,3 +76,42 @@ def test_exit_detected_for_blank_ticker_position(filings_dir):
     # a shares=0 record on the next period end (2025-03-31)
     assert (ghost["shares"] == 0.0).any()
     assert ghost[ghost["shares"] == 0.0]["eod_date"].iloc[0] == "2025-03-31"
+
+
+def test_left_join_keeps_unpriced_rows():
+    holdings = pd.DataFrame([
+        {"portfolio": "baker-bros", "cusip": "111111111", "ticker": "ACME", "shares": 10,
+         "filing_value": 100.0, "eod_date": "2025-01-02"},
+        {"portfolio": "baker-bros", "cusip": "999999999", "ticker": "", "shares": 4,
+         "filing_value": 40.0, "eod_date": "2025-01-02"},
+        {"portfolio": "baker-bros", "cusip": "111111111", "ticker": "ACME", "shares": 10,
+         "filing_value": 100.0, "eod_date": "2025-01-03"},   # price gap this day
+    ])
+    prices = pd.DataFrame([{"ticker": "ACME", "date": "2025-01-02", "close": 5.0}])
+
+    out = ho.calculate_portfolio_values(holdings, prices)
+
+    assert len(out) == 3                        # nothing dropped
+    priced = out[(out["cusip"] == "111111111") & (out["eod_date"] == "2025-01-02")].iloc[0]
+    assert priced["has_price"] is True or priced["has_price"] == True
+    assert priced["position_value"] == 50.0
+    gap = out[(out["cusip"] == "111111111") & (out["eod_date"] == "2025-01-03")].iloc[0]
+    assert bool(gap["has_price"]) is False
+    assert pd.isna(gap["position_value"])
+    blank = out[out["cusip"] == "999999999"].iloc[0]
+    assert bool(blank["has_price"]) is False
+
+
+def test_save_processed_holdings_roundtrips_blank_tickers(tmp_path):
+    df = pd.DataFrame([
+        {"portfolio": "baker-bros", "cusip": "111111111", "ticker": "ACME", "shares": 10,
+         "filing_value": 100.0, "eod_date": "2025-01-02"},
+        {"portfolio": "baker-bros", "cusip": "999999999", "ticker": "", "shares": 4,
+         "filing_value": 40.0, "eod_date": "2025-01-02"},
+    ])
+    out_file = tmp_path / "holdings.csv"
+    ho.save_processed_holdings(df, out_file)
+    back = pd.read_csv(out_file, dtype={"ticker": str}).fillna({"ticker": ""})
+    assert list(back.columns) == ["portfolio", "cusip", "ticker", "shares", "filing_value", "eod_date"]
+    # blank ticker sorts first lexically when eod_date ties (categorical sort, no error)
+    assert back["ticker"].tolist() == ["", "ACME"]
