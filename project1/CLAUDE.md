@@ -75,16 +75,15 @@ The strategy/backtest system (`strategies/`, `utils/strategy_registry.py`, `util
 - **Price consolidation** into master prices.csv table (188K+ records)
 - CSV data layer with all operations (portfolios, holdings, prices)
 - **Dashboard pages**: `1_Dashboard, 2_Trades, 3_Research, 4_Signals, 5_Admin`
-- **Prices page**: Bloomberg dark-theme interactive price chart (`8_Prices.py`); dark CSS injected via `st.markdown()` — the established pattern for themed pages
-- **Top 10 Holdings Weight Over Time** chart on Overview page
-- Historical holdings view (20 quarters of Baker Bros data)
-- **Redesigned Data Management page** with 4 sections:
+- **Top 10 Holdings Weight Over Time** chart
+- Historical holdings view (46 filings of Baker Bros data)
+- **Redesigned Data Management** with 4 sections:
   - **Add New Security**: One-click workflow - automatically fetches prices and metadata (see `dashboard-feature-reference` skill)
   - **View Securities**: Master table with all 162 securities and their metadata in bordered container
   - **Bulk Operations** (Advanced): Background price/metadata fetch, consolidation, **Compute QoQ Changes** per fund (collapsed by default)
   - **Advanced Tools**: Batch CIK processing and fund portfolio management (collapsed by default)
-- **Portfolio Size Analysis page**: Real-time portfolio value tracking with daily granularity (2025 YTD)
-- **QoQ Analytics on Fund Tracking page**: Shares Δ%, Value Δ%, Weight Δ (basis points) auto-computed on first load and cached in `qoq_changes.csv`
+- **Portfolio Size Analysis**: Real-time portfolio value tracking with daily granularity (2025 YTD)
+- **QoQ Analytics**: Shares Δ%, Value Δ%, Weight Δ (basis points) auto-computed on first load and cached in `qoq_changes.csv`
 
 Details on View Securities, Add New Security, Bulk Metadata Fetch, and QoQ Analytics: see the `dashboard-feature-reference` skill.
 
