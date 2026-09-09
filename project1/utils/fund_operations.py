@@ -359,7 +359,7 @@ def fetch_incremental_filings_for_fund(portfolio_id: str, cik: str) -> Dict:
         filing_date = filing['filing_date']
         period_end = filing['report_date']
         try:
-            holdings = scraper.get_13f_holdings(cik, filing['accession_number'])
+            holdings = scraper.get_13f_holdings(cik, filing['accession_number'], period_end)
             if holdings:
                 for holding in holdings:
                     cusip = holding.get('cusip')

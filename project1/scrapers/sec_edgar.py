@@ -94,8 +94,8 @@ class SECEdgarScraper:
 
         return results
 
-    def get_13f_holdings(self, cik: str, accession_number: str) -> list:
-        """Parse holdings from a 13F information table."""
+    def get_13f_holdings(self, cik: str, accession_number: str, period_end_date: str) -> list:
+        """Parse holdings from a 13F information table, with value normalized to whole dollars."""
         # Format accession number for URL (remove dashes)
         acc_formatted = accession_number.replace('-', '')
         cik_padded = cik.zfill(10)
@@ -131,7 +131,10 @@ class SECEdgarScraper:
             table_url = f"{SEC_EDGAR_BASE_URL}/Archives/edgar/data/{cik_padded}/{acc_formatted}/{info_table_file}"
             response = self._make_request(table_url)
 
-            return self._parse_info_table(response.text)
+            holdings = self._parse_info_table(response.text)
+            for holding in holdings:
+                holding['value'] = normalize_13f_value(holding['value'], period_end_date)
+            return holdings
 
         except Exception as e:
             print(f"Error fetching holdings for {accession_number}: {e}")
@@ -198,7 +201,7 @@ class SECEdgarScraper:
                 'company_name': get_text(entry, 'nameOfIssuer'),
                 'share_class': get_text(entry, 'titleOfClass'),
                 'cusip': get_text(entry, 'cusip'),
-                'value': float(get_text(entry, 'value') or 0),  # Value already in correct scale
+                'value': float(get_text(entry, 'value') or 0),  # Raw XML value; normalized to whole dollars in get_13f_holdings()
                 'shares': float(get_nested_text(entry, 'shrsOrPrnAmt', 'sshPrnamt') or 0),
                 'option_type': get_nested_text(entry, 'shrsOrPrnAmt', 'sshPrnamtType'),
                 'investment_discretion': get_text(entry, 'investmentDiscretion'),
@@ -252,7 +255,7 @@ class SECEdgarScraper:
 
             filing_date = filing['filing_date']
             period_end = filing['report_date']
-            holdings = self.get_13f_holdings(cik, filing['accession_number'])
+            holdings = self.get_13f_holdings(cik, filing['accession_number'], period_end)
 
             if holdings:
                 # Try to resolve tickers via CUSIP mapper for each holding
