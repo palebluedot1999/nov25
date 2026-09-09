@@ -44,6 +44,7 @@ streamlit run dashboard/app.py
 - `scripts/consolidate_prices.py` - Merge individual price files into master table
 - `scripts/consolidate_securities.py` - Merge CUSIP cache + metadata into securities.csv
 - `scripts/consolidate_holdings.py` - Process quarterly 13F filings into daily holdings table
+- `scripts/backfill_13f_value_scale.py` - One-time migration: normalizes pre-2022-12-31 13F `value` from thousands to whole dollars. Run once per checkout, BEFORE any re-scrape; guarded against double-application.
 - `data/portfolios.csv` - Portfolio definitions
 - `data/holdings/*.csv` - Historical quarterly holdings (one per filing)
 
@@ -135,12 +136,20 @@ pip install pytest pytest-cov
 ## Notes
 - SEC requires User-Agent with contact email (configured in settings.py)
 - 13F filings are quarterly, ~45 days after quarter end
-- 13F values are in whole dollars. SEC's Form 13F amendment (effective for reporting
+- 13F values are whole dollars. SEC's Form 13F amendment (effective for reporting
   periods ending 2022-12-31 and later) changed the required unit from thousands of
-  dollars to whole dollars; filings for earlier periods were originally scraped in
-  thousands and have been corrected via a one-time backfill (see
-  scrapers/sec_edgar.py's normalize_13f_value()). New scrapes are normalized at
-  ingestion time, so this should never need correcting again.
+  dollars to whole dollars. New scrapes are normalized at ingestion by
+  `normalize_13f_value()` in `scrapers/sec_edgar.py`. Filings scraped under the old
+  scraper (periods before 2022-12-31) are still in thousands and must be corrected
+  once per checkout by running `python scripts/backfill_13f_value_scale.py` and then
+  regenerating `qoq_changes.csv`. Because `data/` is gitignored, each clone/worktree
+  has its own data copy and needs its own one-time run — done BEFORE any re-scrape on
+  that checkout, never after (the fixed scraper already emits whole dollars, and the
+  backfill would double-scale them; a sentinel file and a per-share sanity check guard
+  against that).
+- Data-migration scripts that mutate `data/` (e.g. `scripts/backfill_13f_value_scale.py`)
+  must be run in the canonical checkout, not a git worktree: `data/` is gitignored, so a
+  worktree operates on a disposable private copy and its migration never reaches the repo.
 - OpenFIGI API key is optional but recommended (set `OPENFIGI_API_KEY` env var)
 - CUSIP cache auto-builds from 13F filings and can be viewed/edited in Data Management page
 - Portfolio size calculations use forward-filled prices (weekends/holidays use last trading day price)

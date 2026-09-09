@@ -21,15 +21,23 @@ from config.settings import (
 from utils.cusip_mapping import cusip_to_ticker
 
 
-def normalize_13f_value(value: float, period_end_date: str) -> float:
+def normalize_13f_value(value: float, period_end_date: object) -> float:
     """Normalize a 13F-reported value to whole dollars.
 
     SEC's Form 13F amendment (effective for reporting periods ending
     2022-12-31 and later) changed the required unit from thousands of
     dollars to whole dollars. Filings for earlier periods must be
     multiplied by 1000 to match; later filings are already correct.
+
+    period_end_date is typed `object` because callers pass either a
+    "YYYY-MM-DD" string or, for a missing value, pandas' float NaN; the
+    str() coercion below normalizes both before the comparison.
     """
     period_end_date = str(period_end_date)
+    # The empty-string check is load-bearing: "" sorts before "2022-12-31",
+    # so without it a missing date would be wrongly scaled x1000. "nan"
+    # sorts AFTER the boundary and is already a no-op via the < check below;
+    # it is listed here only for clarity.
     if not period_end_date or period_end_date == "nan":
         return value
     if period_end_date < "2022-12-31":
