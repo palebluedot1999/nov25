@@ -286,3 +286,31 @@ def build_security_reference() -> dict:
         "unresolved": vc.get("unresolved", 0),
         "path": str(SECURITY_REFERENCE_FILE),
     }
+
+
+def enrich_holdings_with_reference(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    if "ticker" not in out.columns:
+        out["ticker"] = ""
+    out["ticker"] = out["ticker"].fillna("").astype(str).str.strip()
+    out["cusip"] = out["cusip"].astype(str).str.strip().str.upper()
+
+    ref = load_security_reference()
+    if ref.empty:
+        out["name"] = out["company_name"] if "company_name" in out.columns else ""
+        out["resolution_status"] = "unresolved"
+        return out
+
+    ref = ref.set_index("cusip")
+    ref_ticker = out["cusip"].map(ref["ticker"]).fillna("")
+    blank = out["ticker"] == ""
+    out.loc[blank, "ticker"] = ref_ticker[blank]
+    out["ticker"] = out["ticker"].fillna("")
+
+    ref_name = out["cusip"].map(ref["name"]).fillna("")
+    if "company_name" in out.columns:
+        out["name"] = ref_name.where(ref_name != "", out["company_name"].fillna(""))
+    else:
+        out["name"] = ref_name
+    out["resolution_status"] = out["cusip"].map(ref["resolution_status"]).fillna("unresolved")
+    return out

@@ -285,3 +285,35 @@ class TestBuildSecurityReference:
         assert stats["ticker_only"] == 2
         assert stats["name_only"] == 1
         assert stats["unresolved"] == 0
+
+
+class TestEnrichHoldings:
+    def test_fills_blank_tickers(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sr, "SECURITY_REFERENCE_FILE", tmp_path / "ref.csv")
+        pd.DataFrame([
+            {**{c: "" for c in sr._REFERENCE_COLS}, "cusip": "111111111", "ticker": "ACME",
+             "name": "Acme Bio Inc.", "resolution_status": "resolved"},
+            {**{c: "" for c in sr._REFERENCE_COLS}, "cusip": "222222222", "ticker": "",
+             "name": "Ghost Inc", "resolution_status": "unresolved"},
+        ]).to_csv(tmp_path / "ref.csv", index=False)
+
+        df = pd.DataFrame([
+            {"cusip": "111111111", "ticker": None, "shares": 10},
+            {"cusip": "222222222", "ticker": "", "shares": 5},
+            {"cusip": "333333333", "ticker": "KEEP", "shares": 1},
+        ])
+        out = sr.enrich_holdings_with_reference(df).set_index("cusip")
+
+        assert out.loc["111111111", "ticker"] == "ACME"
+        assert out.loc["111111111", "name"] == "Acme Bio Inc."
+        assert out.loc["222222222", "ticker"] == ""
+        assert out.loc["222222222", "resolution_status"] == "unresolved"
+        assert out.loc["333333333", "ticker"] == "KEEP"        # incoming ticker preserved
+        assert out["ticker"].isna().sum() == 0
+
+    def test_missing_reference_degrades(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sr, "SECURITY_REFERENCE_FILE", tmp_path / "nope.csv")
+        df = pd.DataFrame([{"cusip": "111111111", "ticker": None, "shares": 1}])
+        out = sr.enrich_holdings_with_reference(df)
+        assert out.loc[0, "ticker"] == ""
+        assert out.loc[0, "resolution_status"] == "unresolved"
