@@ -5,7 +5,10 @@ and build data/processed/security_reference.csv — the joinable master table.
 See docs/superpowers/specs/2026-09-08-security-reference-data-design.md
 """
 
+import re
 import sys
+from datetime import datetime
+from difflib import SequenceMatcher
 from pathlib import Path
 
 import pandas as pd
@@ -90,3 +93,90 @@ def collect_filing_cusips(filings_dir: Path = FILINGS_DIR) -> pd.DataFrame:
             "is_active": bool((quarters == latest_quarter).any()),
         })
     return pd.DataFrame(out_rows)
+
+
+_IDENTIFIER_COLS = ["cusip", "ticker", "name", "cik", "figi", "composite_figi",
+                    "share_class_figi", "security_type", "market_sector",
+                    "exch_code", "source", "resolved_at"]
+
+_SUFFIXES = {"inc", "corp", "corporation", "ltd", "limited", "llc", "co",
+             "company", "plc", "sa", "nv", "ag", "holdings", "holding", "group",
+             "com", "common", "stock", "class", "a", "b", "c", "the"}
+
+
+def _normalize_issuer_name(name: str) -> str:
+    tokens = re.sub(r"[^a-z0-9 ]", " ", str(name).lower()).split()
+    return " ".join(t for t in tokens if t not in _SUFFIXES)
+
+
+def _sec_index(sec_tickers: dict) -> list[tuple[str, str, str]]:
+    idx = []
+    for row in (sec_tickers or {}).values():
+        idx.append((_normalize_issuer_name(row.get("title", "")),
+                    str(row.get("ticker", "")).upper(),
+                    str(row.get("cik_str", ""))))
+    return idx
+
+
+def _match_company_tickers(name, sec_index, threshold: float = 0.90):
+    target = _normalize_issuer_name(name)
+    if not target:
+        return None
+    best, best_ratio = None, 0.0
+    for norm_title, ticker, cik in sec_index:
+        if not norm_title or not ticker:
+            continue
+        r = SequenceMatcher(None, target, norm_title).ratio()
+        if r > best_ratio:
+            best, best_ratio = (ticker, cik), r
+    if best and best_ratio >= threshold:
+        return {"ticker": best[0], "name": name, "cik": best[1]}
+    return None
+
+
+def _load_identifiers() -> pd.DataFrame:
+    if SECURITY_IDENTIFIERS_FILE.exists():
+        return pd.read_csv(SECURITY_IDENTIFIERS_FILE, dtype=str).fillna("")
+    return pd.DataFrame(columns=_IDENTIFIER_COLS)
+
+
+def resolve_cusips(cusips, *, force: bool = False, sec_tickers=None, mapper=None) -> pd.DataFrame:
+    from utils.cusip_mapping import CUSIPMapper
+    mapper = mapper or CUSIPMapper()
+    if sec_tickers is None:
+        sec_tickers = mapper._fetch_sec_tickers()
+    sec_index = _sec_index(sec_tickers)
+
+    if isinstance(cusips, pd.DataFrame):
+        want = cusips[["cusip", "name"]].copy()
+    else:
+        want = pd.DataFrame({"cusip": list(cusips)})
+        want["name"] = ""
+    want["cusip"] = want["cusip"].str.strip().str.upper()
+
+    existing = _load_identifiers()
+    if not force:
+        want = want[~want["cusip"].isin(set(existing["cusip"]))]
+
+    new_rows = []
+    for _, r in want.iterrows():
+        cusip, name = r["cusip"], r.get("name", "")
+        rec = mapper.lookup_full(cusip)
+        if rec and rec.get("ticker"):
+            new_rows.append({**{c: "" for c in _IDENTIFIER_COLS}, **rec,
+                             "cusip": cusip, "source": "openfigi",
+                             "resolved_at": datetime.utcnow().isoformat()})
+            continue
+        m = _match_company_tickers(name, sec_index)
+        if m:
+            new_rows.append({**{c: "" for c in _IDENTIFIER_COLS}, **m,
+                             "cusip": cusip, "source": "company_tickers",
+                             "resolved_at": datetime.utcnow().isoformat()})
+
+    resolved = pd.DataFrame(new_rows, columns=_IDENTIFIER_COLS)
+    if not resolved.empty:
+        combined = pd.concat([existing, resolved], ignore_index=True)
+        combined = combined.drop_duplicates(subset=["cusip"], keep="last")
+        SECURITY_IDENTIFIERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        combined.to_csv(SECURITY_IDENTIFIERS_FILE, index=False)
+    return resolved

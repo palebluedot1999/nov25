@@ -105,3 +105,72 @@ class TestLookupFull:
     def test_no_data_returns_none(self):
         with patch("utils.cusip_mapping.requests.post", return_value=_Resp([{"warning": "no match"}])):
             assert CUSIPMapper().lookup_full("999999999") is None
+
+
+from datetime import datetime
+from utils import security_reference as sr
+
+
+class _FakeMapper:
+    def __init__(self, table):
+        self.table = table
+    def lookup_full(self, cusip):
+        return self.table.get(cusip)
+
+
+class TestResolveCusips:
+    def test_openfigi_hit(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sr, "SECURITY_IDENTIFIERS_FILE", tmp_path / "ids.csv")
+        mapper = _FakeMapper({"111111111": {
+            "ticker": "ACME", "name": "ACME BIO INC", "figi": "BBG1",
+            "composite_figi": "BBG2", "share_class_figi": "BBG3",
+            "security_type": "Common Stock", "market_sector": "Equity", "exch_code": "US",
+        }})
+        df = pd.DataFrame([{"cusip": "111111111", "name": "Acme Bio Inc."}])
+
+        out = sr.resolve_cusips(df, sec_tickers={}, mapper=mapper)
+
+        row = out.set_index("cusip").loc["111111111"]
+        assert row["ticker"] == "ACME"
+        assert row["source"] == "openfigi"
+        assert (tmp_path / "ids.csv").exists()
+
+    def test_name_match_fallback_captures_cik(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sr, "SECURITY_IDENTIFIERS_FILE", tmp_path / "ids.csv")
+        mapper = _FakeMapper({})  # OpenFIGI misses everything
+        sec_tickers = {"0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}}
+        df = pd.DataFrame([{"cusip": "037833100", "name": "APPLE INC"}])
+
+        out = sr.resolve_cusips(df, sec_tickers=sec_tickers, mapper=mapper)
+
+        row = out.set_index("cusip").loc["037833100"]
+        assert row["ticker"] == "AAPL"
+        assert row["source"] == "company_tickers"
+        assert str(row["cik"]) == "320193"
+
+    def test_unresolved_not_written(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sr, "SECURITY_IDENTIFIERS_FILE", tmp_path / "ids.csv")
+        df = pd.DataFrame([{"cusip": "999999999", "name": "Totally Unknown Holdings"}])
+
+        out = sr.resolve_cusips(df, sec_tickers={}, mapper=_FakeMapper({}))
+
+        assert out.empty
+        assert not (tmp_path / "ids.csv").exists() or pd.read_csv(tmp_path / "ids.csv").empty
+
+    def test_skips_already_cached(self, tmp_path, monkeypatch):
+        ids = tmp_path / "ids.csv"
+        pd.DataFrame([{"cusip": "111111111", "ticker": "OLD", "name": "x", "cik": "",
+                       "figi": "", "composite_figi": "", "share_class_figi": "",
+                       "security_type": "", "market_sector": "", "exch_code": "",
+                       "source": "openfigi", "resolved_at": "2026-01-01"}]).to_csv(ids, index=False)
+        monkeypatch.setattr(sr, "SECURITY_IDENTIFIERS_FILE", ids)
+
+        called = []
+        class _Spy(_FakeMapper):
+            def lookup_full(self, cusip):
+                called.append(cusip)
+                return None
+        out = sr.resolve_cusips(["111111111"], sec_tickers={}, mapper=_Spy({}))
+
+        assert called == []          # cached CUSIP not re-queried
+        assert out.empty
