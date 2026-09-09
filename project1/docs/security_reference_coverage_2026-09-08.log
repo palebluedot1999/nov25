@@ -1,0 +1,313 @@
+Security reference coverage — 2026-09-08
+  total: 490
+  resolved: 165
+  ticker_only: 22
+  name_only: 98
+  unresolved: 205
+  path: C:\Users\Thomas\.git\nov25\project1\data\processed\security_reference.csv
+
+Manual-triage worklist (add rows to config/security_overrides.csv):
+cusip,name,first_seen_quarter,last_seen_quarter,n_filings,is_active,resolution_status
+002120103,"aTyr Pharma, Inc.",2015-06-30,2016-03-31,4,False,name_only
+00289Y107,Abeona Therapeutics Inc.,2016-09-30,2020-06-30,16,False,name_only
+00372Y105,Ablynx NV,2017-12-31,2018-03-31,2,False,unresolved
+00434H108,Acceleron Pharma Inc.,2014-12-31,2021-09-30,27,False,unresolved
+004449104,"Achaogen, Inc.",2014-12-31,2017-12-31,13,False,unresolved
+00448Q201,"Achillion Pharmaceuticals, Inc.",2014-12-31,2019-09-30,20,False,unresolved
+00449L102,Achilles Therapeutics plc,2021-03-31,2024-06-30,14,False,unresolved
+00484M106,"Acorda Therapeutics, Inc.",2014-12-31,2019-09-30,16,False,unresolved
+00484MAA4,"Acorda Therapeutics, Inc.",2014-12-31,2017-12-31,13,False,unresolved
+00548A106,"Adamas Pharmaceuticals, Inc.",2016-03-31,2021-03-31,21,False,unresolved
+00767E102,"Aegerion Pharmaceuticals, Inc.",2015-03-31,2015-03-31,1,False,unresolved
+00767EAB8,"Aegerion Pharmaceuticals, Inc.",2015-09-30,2018-06-30,12,False,unresolved
+00771V108,"Aerie Pharmaceuticals, Inc.",2014-12-31,2018-06-30,15,False,name_only
+00773J103,"Aeglea BioTherapeutics, Inc.",2016-06-30,2023-06-30,29,False,unresolved
+00790T100,Advanced Accelerator Applications S.A.,2015-12-31,2017-12-31,9,False,unresolved
+008064107,"Aerovate Therapeutics, Inc.",2021-06-30,2024-09-30,14,False,unresolved
+00835P105,"Aevi Genomic Medicine, Inc.",2016-12-31,2018-12-31,9,False,unresolved
+00887A105,"Aileron Therapeutics, Inc.",2019-06-30,2019-06-30,1,False,name_only
+00900T107,"Aimmune Therapeutics, Inc.",2015-09-30,2020-06-30,20,False,name_only
+00972G108,"Akari Therapeutics, Plc",2015-09-30,2018-06-30,12,False,name_only
+00973Y108,"Akero Therapeutics, Inc.",2020-09-30,2025-09-30,21,False,name_only
+01345P106,"Albireo Pharma, Inc.",2017-06-30,2021-12-31,19,False,unresolved
+014339105,"Alder BioPharmaceuticals, Inc.",2014-12-31,2017-06-30,9,False,unresolved
+015351109,"Alexion Pharmaceuticals, Inc.",2015-06-30,2021-03-31,24,False,name_only
+01626L105,"Aligos Therapeutics, Inc.",2020-12-31,2024-06-30,15,False,name_only
+01671P100,Allakos Inc.,2019-09-30,2022-09-30,13,False,unresolved
+02083G100,"Alpine Immune Sciences, Inc.",2024-03-31,2024-03-31,1,False,unresolved
+023111206,Amarin Corporation plc,2015-03-31,2022-09-30,31,False,unresolved
+03217L106,Amryt Pharma plc,2021-09-30,2021-09-30,1,False,unresolved
+032420101,"Anacor Pharmaceuticals, Inc.",2014-12-31,2016-03-31,6,False,unresolved
+032420AC5,Anacor Pharmaceuticals Inc. 2.0% 15 OCT 2021,2015-12-31,2016-03-31,2,False,unresolved
+03753UAB2,"Apellis Pharmaceuticals, Inc.",2021-06-30,2021-12-31,3,False,unresolved
+03828A101,"Applied Therapeutics, Inc.",2020-03-31,2020-09-30,3,False,unresolved
+03835T200,Aptose Biosciences Inc.,2014-12-31,2016-12-31,8,False,unresolved
+03842B101,"Aquinox Pharmaceuticals, Inc.",2014-12-31,2019-06-30,19,False,name_only
+03890D108,"Aravive, Inc.",2018-12-31,2023-06-30,11,False,unresolved
+04269X105,Array BioPharma Inc.,2014-12-31,2019-06-30,19,False,unresolved
+04269XAA3,Array BioPharma Inc.,2015-03-31,2017-09-30,11,False,unresolved
+042797209,Arrowhead Research Corp.,2014-12-31,2015-12-31,5,False,unresolved
+04300J107,"ArTara Therapeutics, Inc.",2020-03-31,2020-03-31,1,False,name_only
+04351P101,Ascendis Pharma A/S,2015-03-31,2022-12-31,32,False,name_only
+045396108,"Assembly Biosciences, Inc.",2015-03-31,2021-06-30,26,False,name_only
+04624N107,"Asterias Biotherapeutics, Inc.",2014-12-31,2014-12-31,1,False,unresolved
+046513107,"Atara Biotherapeutics, Inc.",2022-06-30,2023-03-31,4,False,name_only
+04746L104,"Athira Pharma, Inc.",2020-09-30,2024-06-30,16,False,unresolved
+04965G109,"Atreca, Inc.",2019-06-30,2023-12-31,19,False,unresolved
+05070R104,"Audentes Therapeutics, Inc.",2018-03-31,2019-12-31,8,False,unresolved
+05211J102,"Auspex Pharmaceuticals, Inc.",2015-03-31,2015-03-31,1,False,unresolved
+05348P401,Avanir Pharmaceuticals,2014-12-31,2014-12-31,1,False,name_only
+05366U100,"AveXis, Inc.",2016-12-31,2018-03-31,6,False,unresolved
+078771102,"Bellerophon Therapeutics, Inc.",2015-03-31,2015-09-30,3,False,unresolved
+079481107,"Bellicum Pharmaceuticals, Inc.",2014-12-31,2019-12-31,21,False,unresolved
+079481404,"Bellicum Pharmaceuticals, Inc.",2020-03-31,2023-03-31,13,False,unresolved
+09060J106,"BioDelivery Sciences International, Inc.",2014-12-31,2020-03-31,16,False,unresolved
+09061GAD3,BioMarin Pharmaceutical Inc.,2014-12-31,2017-03-31,10,False,name_only
+09061GAE1,BioMarin Pharmaceutical Inc.,2014-12-31,2018-09-30,16,False,name_only
+09061GAH4,BioMarin Pharmaceutical Inc.,2017-09-30,2021-09-30,17,False,name_only
+09064M204,Biodel Inc.,2015-03-31,2015-03-31,1,False,unresolved
+09066L162,"BioTime, Inc.",2014-12-31,2018-06-30,15,False,unresolved
+090694100,"Biota Pharmaceuticals, Inc.",2014-12-31,2015-06-30,3,False,name_only
+09072X101,BioPharmX Corporation,2017-03-31,2017-09-30,3,False,unresolved
+09075E100,Bioverativ Inc.,2017-03-31,2017-06-30,2,False,unresolved
+09077B104,"BioAtla, Inc.",2020-12-31,2022-06-30,7,False,name_only
+09609G100,"bluebird bio, Inc.",2014-12-31,2023-09-30,36,False,unresolved
+09627Y109,Blueprint Medicines Corporation,2023-03-31,2025-06-30,2,False,unresolved
+12233L107,Burning Rock Biotech Limited,2020-06-30,2022-06-30,9,False,name_only
+15102KAA8,Celcuity Inc.,2025-09-30,2026-03-31,3,True,name_only
+15117E107,Celladon Corp,2014-12-31,2015-03-31,2,False,unresolved
+15119A202,Celsus Therapeutics,2014-12-31,2014-12-31,1,False,unresolved
+15678U128,"Cerevel Therapeutics Holdings, Inc.",2023-12-31,2024-06-30,3,False,unresolved
+16383L106,"ChemoCentryx, Inc.",2014-12-31,2022-09-30,31,False,unresolved
+16706W102,"Chiasma, Inc.",2020-06-30,2021-06-30,5,False,unresolved
+16934W106,"Chimerix, Inc.",2014-12-31,2017-06-30,11,False,unresolved
+16961L106,"Chinook Therapeutics, Inc.",2020-12-31,2023-06-30,11,False,unresolved
+17240Y109,"CinCor Pharma, Inc.",2022-09-30,2022-12-31,2,False,unresolved
+185575107,Clementia Pharmaceuticals Inc.,2017-09-30,2019-03-31,7,False,unresolved
+189464100,"Clovis Oncology, Inc.",2014-12-31,2015-09-30,4,False,unresolved
+189464AB6,"Clovis Oncology, Inc. 2.5% 9/15/2021",2015-09-30,2016-09-30,5,False,unresolved
+19716T101,"Colucid Pharmaceuticals, Inc.",2016-09-30,2016-12-31,2,False,unresolved
+206022105,"Concert Pharmaceuticals, Inc.",2014-12-31,2016-12-31,9,False,unresolved
+210373106,"Constellation Pharmaceuticals, Inc.",2018-09-30,2021-03-31,11,False,unresolved
+212326102,ContraFect Corporation,2016-09-30,2019-03-31,11,False,unresolved
+21833P103,"Corbus Pharmaceuticals Holdings, Inc.",2016-12-31,2018-06-30,6,False,name_only
+220480AB3,Corsicanto Ltd. 3.5% 1/15/2032,2015-12-31,2016-06-30,3,False,unresolved
+220485AB2,Corsicanto II Designated Activity Company,2018-03-31,2018-09-30,3,False,unresolved
+231269101,"Curis, Inc.",2015-06-30,2016-06-30,5,False,name_only
+23254L207,"Cyclacel Pharmaceuticals, Inc.",2014-12-31,2018-06-30,15,False,unresolved
+23255M105,"Cyclerion Therapeutics, Inc.",2019-06-30,2019-09-30,2,False,name_only
+23257D103,"CymaBay Therapeutics, Inc.",2016-12-31,2022-12-31,23,False,unresolved
+232828509,CytRx Corporation,2014-12-31,2016-09-30,8,False,unresolved
+23284P103,"Cyteir Therapeutics, Inc.",2021-06-30,2022-12-31,7,False,unresolved
+23306J101,DBV Technologies S.A.,2014-12-31,2024-03-31,38,False,name_only
+23306J200,DBV Technologies S.A.,2024-06-30,2024-09-30,2,False,name_only
+23345J104,"DICE Therapeutics, Inc.",2021-09-30,2023-06-30,8,False,name_only
+249827502,"Derma Sciences, Inc.",2014-12-31,2016-12-31,9,False,unresolved
+24983L104,"Dermira, Inc.",2014-12-31,2019-09-30,13,False,unresolved
+253031108,"Dicerna Pharmaceuticals, Inc.",2020-03-31,2020-12-31,4,False,unresolved
+25433V105,"Dimension Therapeutics, Inc.",2015-12-31,2017-09-30,8,False,unresolved
+254668403,"Discovery Laboratories, Inc.",2014-12-31,2015-12-31,5,False,unresolved
+254668502,"Discovery Laboratories, Inc.",2016-03-31,2016-03-31,1,False,unresolved
+25985T102,"Dova Pharmaceuticals, Inc.",2019-06-30,2019-09-30,2,False,unresolved
+26746E103,Dyax Corp.,2014-12-31,2015-12-31,5,False,unresolved
+268158201,Dynavax Technologies Corporation,2015-09-30,2019-12-31,18,False,unresolved
+28249U105,"Eiger BioPharmaceuticals, Inc.",2022-09-30,2022-09-30,1,False,unresolved
+29269A102,"Endocyte, Inc.",2015-09-30,2018-09-30,9,False,unresolved
+29428V104,"Epizyme, Inc.",2014-12-31,2022-06-30,15,False,unresolved
+29604W108,ERYTECH Pharma S.A.,2017-12-31,2018-09-30,4,False,unresolved
+30048L104,"Evofem Biosciences, Inc.",2019-09-30,2021-12-31,10,False,name_only
+30048L203,"Evofem Biosciences, Inc.",2022-06-30,2022-06-30,1,False,name_only
+30161QAC8,"Exelixis, Inc. Notes 4.25% 8/15/2019",2015-09-30,2016-06-30,4,False,unresolved
+31572Q808,"FibroGen, Inc.",2021-12-31,2023-06-30,7,False,unresolved
+33830X104,"Five Prime Therapeutics, Inc.",2014-12-31,2020-12-31,14,False,unresolved
+33938J106,"Flexion Therapeutics, Inc.",2015-12-31,2015-12-31,1,False,name_only
+34633R104,"Forma Therapeutics Holdings, Inc.",2020-06-30,2022-09-30,10,False,unresolved
+34983P104,"Forty Seven, Inc.",2018-06-30,2019-09-30,6,False,unresolved
+350465100,"Foundation Medicine, Inc.",2014-12-31,2016-12-31,9,False,unresolved
+35803L108,"Frequency Therapeutics, Inc.",2019-12-31,2021-06-30,7,False,unresolved
+36197T103,GW Pharmaceuticals plc,2016-03-31,2020-12-31,16,False,unresolved
+3621LQ109,"G1 Therapeutics, Inc.",2018-03-31,2020-03-31,9,False,name_only
+37148K100,Generation Bio Co.,2024-03-31,2025-06-30,6,False,unresolved
+37186H100,Genetron Holdings Limited,2020-09-30,2023-09-30,13,False,unresolved
+37244C101,"Genomic Health, Inc.",2014-12-31,2019-09-30,20,False,unresolved
+375558AP8,"Gilead Sciences, Inc. 1.625% 5/1/16",2014-12-31,2016-03-31,6,False,unresolved
+37890U108,"Global Blood Therapeutics, Inc.",2015-09-30,2022-09-30,14,False,unresolved
+38000Q102,"GlycoMimetics, Inc.",2016-06-30,2018-06-30,9,False,unresolved
+38406L103,Gracell Biotechnologies Inc.,2023-06-30,2023-12-31,3,False,unresolved
+41358P106,"Harpoon Therapeutics, Inc.",2019-03-31,2020-03-31,5,False,unresolved
+43906K100,HOOKIPA Pharma Inc.,2019-06-30,2024-03-31,20,False,unresolved
+449585108,"IGM Biosciences, Inc.",2019-09-30,2025-06-30,24,False,unresolved
+45168K306,"Idera Pharmaceuticals, Inc.",2014-12-31,2018-03-31,14,False,name_only
+45168K405,"Idera Pharmaceuticals, Inc.",2018-06-30,2021-03-31,12,False,name_only
+451731103,"Ignyta, Inc.",2014-12-31,2017-12-31,13,False,unresolved
+45252L103,Immune Design Corp.,2015-06-30,2018-03-31,12,False,unresolved
+45253H101,"ImmunoGen, Inc.",2015-03-31,2023-06-30,13,False,unresolved
+452907108,"Immunomedics, Inc.",2020-03-31,2020-09-30,3,False,unresolved
+45337CAJ1,Incyte Corporation  Notes 4.75% 10/1/2015 144A,2014-12-31,2015-06-30,3,False,unresolved
+45337CAK8,Incyte Corporation,2014-12-31,2016-12-31,9,False,name_only
+45337CAL6,Incyte Corporation,2014-12-31,2016-12-31,9,False,name_only
+457669AA7,Insmed Incorporated,2024-06-30,2024-06-30,1,False,unresolved
+457669AB5,Insmed Incorporated,2021-06-30,2025-03-31,11,False,unresolved
+45780VAB8,Inotek Pharmaceuticals Corp.,2016-09-30,2018-03-31,7,False,unresolved
+45783C101,"Instil Bio, Inc.",2021-03-31,2023-09-30,11,False,name_only
+45790W108,"Inozyme Pharma, Inc.",2020-09-30,2022-06-30,8,False,unresolved
+46116X101,"Intra-Cellular Therapies, Inc.",2015-03-31,2017-12-31,12,False,unresolved
+46185L103,Invitae Corporation,2015-03-31,2023-12-31,36,False,unresolved
+46185LAB9,Invitae Corporation,2020-09-30,2022-12-31,10,False,unresolved
+46185LAD5,Invitae Corporation,2023-06-30,2023-12-31,3,False,unresolved
+46185LAH6,Invitae Corporation,2023-09-30,2023-12-31,2,False,unresolved
+46186M209,InVivo Therapeutics Holdings Corp.,2016-03-31,2017-12-31,8,False,name_only
+462222AF7,"Ionis Pharmaceuticals, Inc.",2024-12-31,2024-12-31,1,False,name_only
+464330109,"Isis Pharmaceuticals, Inc.",2014-12-31,2015-09-30,4,False,name_only
+46489V104,"Perspective Therapeutics, Inc.",2023-06-30,2024-03-31,4,False,name_only
+46565G104,"iTeos Therapeutics, Inc.",2020-09-30,2023-09-30,13,False,unresolved
+46583P102,"IVERIC bio, Inc.",2019-12-31,2021-06-30,7,False,unresolved
+481116101,"Jounce Therapeutics, Inc.",2017-03-31,2018-06-30,6,False,unresolved
+48205A109,"Juno Therapeutics, Inc.",2014-12-31,2017-06-30,11,False,name_only
+483119202,"KALA BIO, Inc.",2022-12-31,2025-12-31,13,False,name_only
+48576A100,"Karuna Therapeutics, Inc.",2020-03-31,2022-06-30,10,False,unresolved
+48576U106,Karyopharm Therapeutics Inc.,2014-12-31,2017-12-31,13,False,name_only
+49372L100,"Kezar Life Sciences, Inc.",2020-06-30,2022-12-31,11,False,unresolved
+50107A104,"Kronos Bio, Inc.",2022-09-30,2022-12-31,2,False,unresolved
+501570105,"Kythera Biopharmaceuticals, Inc.",2014-12-31,2015-06-30,3,False,unresolved
+503459604,La Jolla Pharmaceutical Company,2014-12-31,2019-09-30,20,False,unresolved
+52187K101,"Leap Therapeutics, Inc.",2019-09-30,2023-03-31,15,False,unresolved
+53619R102,"Lion Biotechnologies, Inc.",2015-03-31,2016-03-31,5,False,unresolved
+53630X104,Lipocine Inc.,2014-12-31,2015-03-31,2,False,name_only
+54142F102,"LogicBio Therapeutics, Inc.",2020-12-31,2022-09-30,8,False,name_only
+548862101,"Loxo Oncology, Inc.",2014-12-31,2017-09-30,12,False,unresolved
+56854Q101,"Marinus Pharmaceuticals, Inc.",2014-12-31,2015-12-31,5,False,name_only
+57055L107,"Marker Therapeutics, Inc.",2018-12-31,2020-06-30,7,False,name_only
+576314108,"Mast Therapeutics, Inc.",2014-12-31,2016-09-30,8,False,unresolved
+576810105,"Matinas BioPharma Holdings, Inc.",2019-09-30,2020-06-30,4,False,name_only
+58436Q203,"Medgenics, Inc.",2015-12-31,2016-09-30,4,False,unresolved
+58501N101,"Medivation, Inc.",2015-09-30,2016-06-30,4,False,unresolved
+58501NAA9,"Medivation, Inc. 2.625% 4/1/17",2014-12-31,2015-06-30,3,False,unresolved
+586858102,Menlo Therapeutics Inc.,2018-03-31,2020-03-31,9,False,unresolved
+59045L106,"Mersana Therapeutics, Inc.",2023-03-31,2024-12-31,8,False,unresolved
+60040X103,"Millendo Therapeutics, Inc.",2019-12-31,2020-03-31,2,False,unresolved
+603380106,"Minerva Neurosciences, Inc.",2016-06-30,2020-03-31,4,False,name_only
+60468T105,"Mirati Therapeutics, Inc.",2014-12-31,2023-12-31,37,False,unresolved
+608550109,"Molecular Templates, Inc.",2017-09-30,2021-03-31,15,False,unresolved
+60877T100,"Momenta Pharmaceuticals, Inc.",2018-03-31,2018-09-30,3,False,unresolved
+61775R105,"Morphic Holding, Inc.",2023-09-30,2023-09-30,1,False,unresolved
+62857M105,"MyoKardia, Inc.",2016-09-30,2020-09-30,17,False,unresolved
+62921N105,"NGM Biopharmaceuticals, Inc.",2019-06-30,2022-06-30,13,False,unresolved
+62957M104,Nabriva Therapeutics AG,2015-09-30,2017-03-31,7,False,unresolved
+640268108,Nektar Therapeutics,2017-12-31,2018-03-31,2,False,name_only
+64049K104,"Neoleukin Therapeutics, Inc.",2019-09-30,2023-06-30,16,False,unresolved
+64049K203,"Neoleukin Therapeutics, Inc.",2023-09-30,2023-09-30,1,False,unresolved
+64125CAD1,"Neurocrine Biosciences, Inc.",2018-06-30,2020-09-30,10,False,name_only
+651511107,NewLink Genetics Corporation,2017-06-30,2018-06-30,5,False,unresolved
+65343E108,"NextCure, Inc.",2019-06-30,2019-12-31,3,False,name_only
+65344D109,"NexImmune, Inc.",2021-03-31,2022-06-30,6,False,unresolved
+670002104,"Novavax, Inc.",2014-12-31,2018-12-31,13,False,name_only
+670002AB0,"Novavax, Inc.",2017-03-31,2018-06-30,6,False,name_only
+67778H200,"Ohr Pharmaceuticals, Inc.",2015-03-31,2015-12-31,4,False,name_only
+683745103,Ophthotech Corporation,2014-12-31,2016-09-30,8,False,unresolved
+68570P101,Orchard Therapeutics plc,2018-12-31,2021-06-30,11,False,unresolved
+68827R108,"Osiris Therapeutics, Inc.",2014-12-31,2016-12-31,9,False,unresolved
+68906L105,"Otonomy, Inc.",2021-03-31,2022-09-30,7,False,unresolved
+69242L106,"Oyster Point Pharma, Inc.",2020-06-30,2022-03-31,8,False,unresolved
+696077403,"Palatin Technologies, Inc.",2014-12-31,2017-06-30,11,False,name_only
+702712100,"Passage Bio, Inc.",2020-03-31,2022-06-30,10,False,name_only
+716933106,Pharmacyclics Inc.,2014-12-31,2015-03-31,2,False,unresolved
+730541109,POINT Biopharma Global Inc.,2022-09-30,2023-09-30,5,False,unresolved
+74006W108,"Praxis Precision Medicines, Inc.",2022-12-31,2023-12-31,5,False,name_only
+74257L108,Principia Biopharma Inc.,2018-09-30,2020-06-30,8,False,unresolved
+743187106,"Progenics Pharmaceuticals, Inc.",2014-12-31,2018-06-30,15,False,unresolved
+74346L101,"ProNAi Therapeutics, Inc.",2015-09-30,2016-12-31,6,False,unresolved
+74365AAB7,"Protalix BioTherapeutics, Inc.",2014-12-31,2017-12-31,13,False,name_only
+74371L109,"Proteon Therapeutics, Inc.",2014-12-31,2018-12-31,17,False,unresolved
+746927102,QLT Inc.,2014-12-31,2014-12-31,1,False,unresolved
+74933V108,"Ra Pharmaceuticals, Inc.",2016-12-31,2020-03-31,14,False,name_only
+75615P103,"Reata Pharmaceuticals, Inc.",2019-12-31,2022-12-31,13,False,name_only
+756207106,"Receptos, Inc.",2014-12-31,2015-06-30,3,False,unresolved
+75915K309,Regulus Therapeutics Inc.,2025-03-31,2025-03-31,1,False,unresolved
+76028H209,Repros Therapeutics Inc.,2014-12-31,2015-09-30,4,False,name_only
+766559603,"Rigel Pharmaceuticals, Inc.",2014-12-31,2018-06-30,9,False,name_only
+767836109,"Ritter Pharmaceuticals, Inc.",2015-06-30,2017-12-31,11,False,unresolved
+767836307,"Ritter Pharmaceuticals, Inc.",2018-03-31,2019-09-30,7,False,unresolved
+78667J108,"Sage Therapeutics, Inc.",2014-12-31,2024-06-30,18,False,unresolved
+795435106,Salix Pharmaceuticals,2014-12-31,2014-12-31,1,False,name_only
+795435AC0,Salix Pharmaceuticals Inc. 2.75% 5/15/15,2014-12-31,2015-03-31,2,False,unresolved
+795435AE6,Salix Pharmaceuticals Inc. 1.5% 3/15/19,2014-12-31,2015-03-31,2,False,unresolved
+803607AB6,"Sarepta Therapeutics, Inc.",2021-03-31,2022-06-30,6,False,name_only
+811292101,"SCYNEXIS, Inc.",2016-06-30,2016-12-31,3,False,name_only
+81181C104,Seagen Inc.,2020-09-30,2023-09-30,13,False,unresolved
+812578102,"Seattle Genetics, Inc.",2014-12-31,2020-06-30,23,False,unresolved
+816212104,"Selecta Biosciences, Inc.",2016-06-30,2018-06-30,9,False,name_only
+81750R102,"Seres Therapeutics, Inc.",2015-06-30,2017-06-30,9,False,name_only
+817763105,"Sesen Bio, Inc.",2018-06-30,2018-06-30,1,False,unresolved
+82640U107,"Sierra Oncology, Inc.",2018-12-31,2019-09-30,4,False,unresolved
+83422E105,Solid Biosciences Inc.,2018-03-31,2018-12-31,4,False,name_only
+84652J103,"Spark Therapeutics, Inc.",2015-03-31,2019-09-30,19,False,unresolved
+849431101,"Spring Bank Pharmaceuticals, Inc.",2016-12-31,2019-12-31,13,False,unresolved
+85205L107,"SpringWorks Therapeutics, Inc.",2022-12-31,2023-09-30,4,False,unresolved
+85858C107,"Stemline Therapeutics, Inc.",2014-12-31,2018-06-30,15,False,unresolved
+867328601,"Sunesis Pharmaceuticals, Inc.",2014-12-31,2016-06-30,7,False,unresolved
+867328700,"Sunesis Pharmaceuticals, Inc.",2016-09-30,2020-09-30,17,False,unresolved
+867328874,"Sunesis Pharmaceuticals, Inc.",2020-12-31,2020-12-31,1,False,unresolved
+86889P109,"Surrozen, Inc.",2021-09-30,2022-09-30,5,False,unresolved
+87159A103,Synageva Biopharma Corp.,2014-12-31,2015-03-31,2,False,unresolved
+87162T206,Synta Pharmaceuticals Corp.,2014-12-31,2016-06-30,3,False,name_only
+871639308,"Synergy Pharmaceuticals, Inc.",2014-12-31,2015-09-30,2,False,unresolved
+87184Q107,"Syros Pharmaceuticals, Inc.",2016-06-30,2021-06-30,21,False,name_only
+87424L108,Talis Biomedical Corporation,2021-03-31,2023-03-31,9,False,unresolved
+87808K106,TCR2 Therapeutics Inc.,2020-09-30,2023-03-31,11,False,name_only
+87911B209,Tekmira Pharmaceuticals Corp.,2014-12-31,2015-06-30,3,False,name_only
+88032L100,"Tenax Therapeutics, Inc.",2015-06-30,2017-12-31,10,False,name_only
+880881107,"Terns Pharmaceuticals, Inc.",2025-12-31,2025-12-31,1,False,name_only
+881569107,Tesaro Inc.,2014-12-31,2014-12-31,1,False,unresolved
+88165N105,"Tetraphase Pharmaceuticals, Inc.",2017-09-30,2018-06-30,4,False,unresolved
+885807206,"Threshold Pharmaceuticals, Inc.",2014-12-31,2015-09-30,4,False,unresolved
+890260409,Tonix Pharmaceuticals Holdings Corp.,2017-03-31,2018-06-30,6,False,name_only
+893716209,"Transition Therapeutics, Inc.",2015-03-31,2015-03-31,1,False,unresolved
+89532E109,"Trevena, Inc.",2015-09-30,2018-06-30,12,False,unresolved
+89610F101,"Tricida, Inc.",2018-06-30,2022-09-30,17,False,unresolved
+89610FAB7,"Tricida, Inc.",2021-06-30,2021-12-31,3,False,unresolved
+89620X506,Trillium Therapeutics Inc.,2015-09-30,2019-12-31,18,False,name_only
+89853L104,"T2 Biosystems, Inc.",2017-09-30,2018-06-30,4,False,unresolved
+901384107,"2seventy bio, Inc.",2021-12-31,2025-03-31,14,False,unresolved
+92337C104,"Verastem, Inc.",2020-12-31,2023-03-31,10,False,name_only
+925050106,Verona Pharma plc,2025-03-31,2025-06-30,2,False,unresolved
+92529L102,"Versartis, Inc.",2014-12-31,2018-09-30,16,False,unresolved
+92536C103,Veru Inc.,2022-09-30,2023-03-31,3,False,name_only
+92539P101,"Verve Therapeutics, Inc.",2021-06-30,2025-06-30,17,False,name_only
+92731L106,"Vincerx Pharma, Inc.",2021-09-30,2023-06-30,8,False,unresolved
+92847N103,"Vitae Pharmaceuticals, Inc.",2015-03-31,2016-09-30,7,False,name_only
+929033108,Vor Biopharma Inc.,2022-06-30,2023-09-30,6,False,name_only
+92941V308,VYNE Therapeutics Inc.,2025-09-30,2025-09-30,1,False,name_only
+97382D105,"Windtree Therapeutics, Inc.",2016-06-30,2017-03-31,4,False,name_only
+98411C100,"XenoPort, Inc.",2014-12-31,2016-06-30,7,False,unresolved
+98411CAB6,"XenoPort, Inc. Notes 2.5% 2/1/2022",2016-03-31,2016-06-30,2,False,unresolved
+98419J107,XOMA Corporation,2014-12-31,2015-06-30,3,False,unresolved
+984241109,"Y-mAbs Therapeutics, Inc.",2018-09-30,2019-12-31,6,False,unresolved
+98885E103,"Zafgen, Inc.",2015-03-31,2015-09-30,3,False,unresolved
+98973P101,"ZIOPHARM Oncology, Inc.",2014-12-31,2015-06-30,3,False,unresolved
+98978L105,"Zogenix, Inc.",2014-12-31,2015-06-30,3,False,unresolved
+98978L204,"Zogenix, Inc.",2015-09-30,2017-06-30,8,False,unresolved
+98985W102,Zymeworks Inc.,2018-06-30,2022-09-30,18,False,name_only
+G1110E107,Biohaven Ltd.,2022-12-31,2022-12-31,1,False,name_only
+G3165V109,ARYA Sciences Acquisition Corp.,2020-03-31,2020-06-30,2,False,unresolved
+G46188101,Horizon Therapeutics Public Ltd Co,2020-03-31,2022-12-31,12,False,unresolved
+G5269C101,"Kiniksa Pharmaceuticals, Ltd.",2018-06-30,2024-03-31,24,False,name_only
+G5785G107,Mallinckrodt PUB LTD CO,2014-12-31,2014-12-31,1,False,unresolved
+G63365103,Mural Oncology plc,2024-03-31,2024-03-31,1,False,unresolved
+G63637105,Nabriva Therapeutics plc,2017-06-30,2018-06-30,5,False,unresolved
+G9381B108,Urovant Sciences Ltd.,2019-12-31,2020-09-30,4,False,name_only
+H0036K147,ADC Therapeutics SA,2020-06-30,2021-06-30,5,False,name_only
+H17182108,CRISPR Therapeutics AG,2024-06-30,2025-03-31,4,False,name_only
+M2239P109,Alcobra Ltd.,2014-12-31,2016-12-31,9,False,unresolved
+M46135105,Foamix Pharmaceuticals Ltd.,2014-12-31,2019-09-30,20,False,unresolved
+M47238106,Galmed Pharmaceuticals Ltd.,2018-06-30,2021-03-31,12,False,name_only
+M47364100,Gamida Cell Ltd.,2020-06-30,2021-12-31,7,False,unresolved
+M68830104,MediWound Ltd.,2014-12-31,2018-06-30,15,False,name_only
+M74231107,NeuroDerm Ltd.,2014-12-31,2017-09-30,12,False,unresolved
+M96088105,UroGen Pharma Ltd.,2019-09-30,2020-03-31,3,False,name_only
+N01045108,Affimed N.V.,2014-12-31,2023-09-30,36,False,unresolved
+N44821101,Inflarx N.V.,2017-12-31,2021-03-31,13,False,name_only
+N5749R100,Merus N.V.,2016-06-30,2025-09-30,31,False,unresolved
+N62509109,NewAmsterdam Pharma Company N.V.,2024-03-31,2024-09-30,3,False,name_only
+N71542109,ProQR Therapeutics N.V.,2014-12-31,2016-12-31,9,False,name_only
+N90064101,uniQure N.V.,2014-12-31,2020-12-31,22,False,name_only

@@ -30,6 +30,15 @@ def generate_targets(portfolio_id: str, filing_date: str | None = None, top_n: i
     if holdings.empty:
         return {}
 
+    # Only tradable, price-joinable securities (ticker + FIGI). A blank ticker must
+    # never become a "" target-weight key flowing to the drift layer / Trades page.
+    # load_holdings_by_date enriches, so resolution_status is normally present; if a
+    # future un-enriched path lacks the column, fall through without gating.
+    if "resolution_status" in holdings.columns:
+        holdings = holdings[holdings["resolution_status"] == "resolved"]
+        if holdings.empty:
+            return {}
+
     top = holdings.nlargest(top_n, "value")
     n = len(top)
     if n == 0:

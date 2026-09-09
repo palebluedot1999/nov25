@@ -25,6 +25,18 @@ python scripts/fetch_security_metadata.py
 streamlit run dashboard/app.py
 ```
 
+## Data migration order (run in this order after a fresh checkout or a filing re-scrape)
+1. `python scripts/backfill_13f_value_scale.py` — normalize pre-2022-12-31 13F `value`
+   to whole dollars (once per checkout, before any re-scrape; guarded against
+   double-application).
+2. `python scripts/build_security_reference.py` — build
+   `data/processed/security_reference.csv`. **Must precede step 4** — if `holdings.csv`
+   is regenerated before the reference exists, every ticker lands blank.
+3. `python scripts/fetch_all_prices.py` (or the background price fetch) — pull prices
+   for any newly-resolved tickers.
+4. `python scripts/consolidate_holdings.py` — regenerate `data/processed/holdings.csv`.
+5. Recompute `qoq_changes.csv` (Data Management → Compute QoQ, or the script).
+
 ## Key Files
 - `dashboard/app.py` - Main Streamlit app (run with `streamlit run dashboard/app.py`)
 - `scrapers/sec_edgar.py` - 13F filing scraper (outputs CSV)
@@ -45,8 +57,12 @@ streamlit run dashboard/app.py
 - `scripts/consolidate_securities.py` - Merge CUSIP cache + metadata into securities.csv
 - `scripts/consolidate_holdings.py` - Process quarterly 13F filings into daily holdings table
 - `scripts/backfill_13f_value_scale.py` - One-time migration: normalizes pre-2022-12-31 13F `value` from thousands to whole dollars. Run once per checkout, BEFORE any re-scrape; guarded against double-application.
-- `data/portfolios.csv` - Portfolio definitions
-- `data/holdings/*.csv` - Historical quarterly holdings (one per filing)
+- `utils/security_reference.py` - Sweep 13F CUSIPs, resolve identifiers (OpenFIGI + SEC company_tickers name-match), build the master security_reference.csv; `enrich_holdings_with_reference()` fills tickers/names everywhere
+- `scripts/build_security_reference.py` - Build data/processed/security_reference.csv + a coverage report (flags: --force, --no-api)
+- `config/security_overrides.csv` - Committed manual CUSIP->identifier overrides / suppressions
+- `data/processed/security_reference.csv` - Master security reference: one row per CUSIP ever held, with identifiers + provenance + filing history
+- `data/raw/portfolios.csv` - Portfolio definitions
+- `data/raw/13f_filings/*.csv` - Historical quarterly 13F filings (one per filing)
 
 ## Design Decisions
 - **CSV-only storage**: Simplified architecture, no database overhead
@@ -54,6 +70,9 @@ streamlit run dashboard/app.py
 - **Positions tab shows latest filing**: Most recent CSV by filing date
 - **Quarterly filing data used as cost basis for P&L**
 - **Data fetched on-demand when dashboard loads** (no background scheduler)
+
+## Data Platform
+Raw inputs live in `data/raw/`, derived tables in `data/processed/` (all gitignored; `config/security_overrides.csv` is the one committed data-shaped file). Full schema catalogue: `docs/superpowers/specs/2026-09-08-security-reference-data-design.md` §3.
 
 ## Strategies
 
@@ -67,17 +86,16 @@ The strategy/backtest system (`strategies/`, `utils/strategy_registry.py`, `util
 - **Security metadata enrichment** - 31 fundamental fields (sector, industry, financials, ratios)
 - **Price consolidation** into master prices.csv table (188K+ records)
 - CSV data layer with all operations (portfolios, holdings, prices)
-- **Dashboard pages (8 total)**: Overview (1), Fund Tracking (2), P&L Analysis (3), Tracking Error (4), Calendar (5), Data Management (6), Portfolio Size (7), Prices (8)
-- **Prices page**: Bloomberg dark-theme interactive price chart (`8_Prices.py`); dark CSS injected via `st.markdown()` — the established pattern for themed pages
-- **Top 10 Holdings Weight Over Time** chart on Overview page
-- Historical holdings view (20 quarters of Baker Bros data)
-- **Redesigned Data Management page** with 4 sections:
+- **Dashboard pages**: `1_Dashboard, 2_Trades, 3_Research, 4_Signals, 5_Admin`
+- **Top 10 Holdings Weight Over Time** chart
+- Historical holdings view (46 filings of Baker Bros data)
+- **Redesigned Data Management** with 4 sections:
   - **Add New Security**: One-click workflow - automatically fetches prices and metadata (see `dashboard-feature-reference` skill)
   - **View Securities**: Master table with all 162 securities and their metadata in bordered container
   - **Bulk Operations** (Advanced): Background price/metadata fetch, consolidation, **Compute QoQ Changes** per fund (collapsed by default)
   - **Advanced Tools**: Batch CIK processing and fund portfolio management (collapsed by default)
-- **Portfolio Size Analysis page**: Real-time portfolio value tracking with daily granularity (2025 YTD)
-- **QoQ Analytics on Fund Tracking page**: Shares Δ%, Value Δ%, Weight Δ (basis points) auto-computed on first load and cached in `qoq_changes.csv`
+- **Portfolio Size Analysis**: Real-time portfolio value tracking with daily granularity (2025 YTD)
+- **QoQ Analytics**: Shares Δ%, Value Δ%, Weight Δ (basis points) auto-computed on first load and cached in `qoq_changes.csv`
 
 Details on View Securities, Add New Security, Bulk Metadata Fetch, and QoQ Analytics: see the `dashboard-feature-reference` skill.
 
@@ -142,7 +160,8 @@ pip install pytest pytest-cov
   `normalize_13f_value()` in `scrapers/sec_edgar.py`. Filings scraped under the old
   scraper (periods before 2022-12-31) are still in thousands and must be corrected
   once per checkout by running `python scripts/backfill_13f_value_scale.py` and then
-  regenerating `qoq_changes.csv`. Because `data/` is gitignored, each clone/worktree
+  regenerating `holdings.csv` (`python scripts/consolidate_holdings.py`) and
+  `qoq_changes.csv`. Because `data/` is gitignored, each clone/worktree
   has its own data copy and needs its own one-time run — done BEFORE any re-scrape on
   that checkout, never after (the fixed scraper already emits whole dollars, and the
   backfill would double-scale them; a sentinel file and a per-share sanity check guard

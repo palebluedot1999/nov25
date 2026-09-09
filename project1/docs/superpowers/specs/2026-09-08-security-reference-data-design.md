@@ -232,9 +232,10 @@ requests (≤100 jobs/request with a key).
      marketSector, exchCode, name` — not just `ticker`), batched to API limits.
   2. For CUSIPs still without a ticker: `_match_company_tickers(name)` —
      normalise (`strip Inc|Corp|Ltd|LLC|COM|Common Stock|/…`, lowercase),
-     `rapidfuzz.token_sort_ratio` against the `title` field of SEC
-     `company_tickers.json`; accept only ≥ threshold (default 92), tag
+     `difflib.SequenceMatcher` against the `title` field of SEC
+     `company_tickers.json`; accept only ≥ threshold (default 0.90), tag
      `source=company_tickers`, and capture the matched row's `cik_str` as `cik`.
+     Implementation note: uses stdlib `difflib.SequenceMatcher` on normalized names, not `rapidfuzz` — avoids a new dependency.
   Upsert results into `security_identifiers.csv`; return the resolved frame.
 - `build_security_reference() -> dict`
   Merge `collect_filing_cusips()` ⨝ `security_identifiers.csv` ⨝

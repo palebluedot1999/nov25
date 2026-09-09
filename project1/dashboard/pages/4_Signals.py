@@ -66,7 +66,11 @@ with tab_bb:
                 display["QoQ Weight Δ"] = display.apply(
                     lambda r: "NEW" if r.get("is_new") else (f"{int(r['qoq_weight_delta']):+d}bp" if pd.notna(r.get("qoq_weight_delta")) else "—"), axis=1
                 )
-                cols = ["ticker", "company_name", "shares", "value", "weight", "QoQ Shares Δ%", "QoQ Weight Δ"]
+                display["label"] = display["ticker"].astype(str).where(
+                    display["ticker"].astype(str).str.strip() != "",
+                    display.get("name", display.get("company_name", "")),
+                )
+                cols = ["label", "ticker", "company_name", "shares", "value", "weight", "QoQ Shares Δ%", "QoQ Weight Δ"]
                 show_cols = [c for c in cols if c in display.columns]
                 st.dataframe(display[show_cols], use_container_width=True, hide_index=True)
                 st.download_button("Export CSV", display[show_cols].to_csv(index=False), "holdings.csv", "text/csv")

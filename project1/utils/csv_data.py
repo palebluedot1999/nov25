@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
 
+from utils.security_reference import enrich_holdings_with_reference
+
 # Paths
 DATA_DIR = Path(__file__).parent.parent / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
@@ -120,6 +122,9 @@ def load_latest_holdings(portfolio_id: str) -> pd.DataFrame:
     if df.empty:
         return df
 
+    if not df.empty:
+        df = enrich_holdings_with_reference(df)
+
     # Calculate weight
     total_value = df['value'].sum()
     if total_value > 0:
@@ -150,6 +155,9 @@ def load_holdings_by_date(portfolio_id: str, filing_date: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.read_csv(filepath)
+
+    if not df.empty:
+        df = enrich_holdings_with_reference(df)
 
     # Calculate weight and value_millions
     if not df.empty:
@@ -196,7 +204,10 @@ def load_processed_holdings(portfolio_id: str, start_date: Optional[str] = None)
         start_date: Optional start date (YYYY-MM-DD) to filter from
 
     Returns:
-        DataFrame with columns: portfolio, ticker, cusip, shares, eod_date
+        DataFrame with columns: portfolio, cusip, ticker, shares, filing_value, eod_date,
+        plus name and resolution_status left-joined from security_reference.csv.
+        Degrades gracefully when security_reference.csv is absent: name is present but
+        empty and resolution_status is "unresolved" (never raises).
     """
     if not PROCESSED_HOLDINGS_FILE.exists():
         return pd.DataFrame()
@@ -209,6 +220,9 @@ def load_processed_holdings(portfolio_id: str, start_date: Optional[str] = None)
     # Filter by start date if provided
     if start_date:
         df = df[df['eod_date'] >= start_date]
+
+    if not df.empty:
+        df = enrich_holdings_with_reference(df)
 
     return df
 

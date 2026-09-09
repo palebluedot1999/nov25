@@ -111,10 +111,28 @@ def _get_active_filing(trade_date: str, filings_list: list[dict]) -> dict | None
 
 
 def _select_top_holdings(holdings_df: pd.DataFrame, n: int) -> pd.DataFrame:
-    """Return top N positions by portfolio weight (ticker, company_name, weight_pct)."""
+    """Return top N positions by portfolio weight (ticker, company_name, weight_pct).
+
+    Selection gates on ``resolution_status == "resolved"`` (ticker + FIGI present,
+    i.e. a tradable, price-joinable security) per the security-reference spec §7 —
+    not merely a non-blank ticker. ``load_holdings_by_date`` always enriches, so the
+    column is present; ``.get(..., "resolved")`` keeps this sane if an un-enriched
+    frame is ever passed.
+    """
+    # Log names dropped by the resolution_status gate that would have passed the
+    # old `ticker != ""` test. Computed from holdings_df (always available) BEFORE
+    # the df.empty early return, so it still fires when the gate drops everything.
+    dropped = holdings_df[
+        (holdings_df["value"] > 0)
+        & (holdings_df["ticker"].fillna("").astype(str) != "")
+        & (holdings_df.get("resolution_status", "resolved") != "resolved")
+    ]
+    if not dropped.empty:
+        logger.info("Top-N: excluded %d non-resolved names: %s",
+                    len(dropped), sorted(dropped["ticker"].astype(str).unique())[:10])
+
     df = holdings_df[
-        holdings_df["ticker"].notna()
-        & (holdings_df["ticker"] != "")
+        (holdings_df.get("resolution_status", "resolved") == "resolved")
         & (holdings_df["value"] > 0)
     ].copy()
 
