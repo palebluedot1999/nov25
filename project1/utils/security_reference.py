@@ -197,7 +197,10 @@ def _load_overrides() -> pd.DataFrame:
         if c not in df.columns:
             df[c] = ""
     df["cusip"] = df["cusip"].str.strip().str.upper()
-    return df[df["cusip"] != ""]
+    df["ticker"] = df["ticker"].str.strip()
+    df = df[df["cusip"] != ""]
+    df = df.drop_duplicates(subset=["cusip"], keep="last")
+    return df
 
 
 def load_security_reference() -> pd.DataFrame:
@@ -237,7 +240,7 @@ def build_security_reference() -> dict:
             source = "override"
             ticker = ""
             name = ov.get("name") or idr.get("name") or s["name"]
-        elif idr.get("ticker"):
+        elif idr.get("ticker") and idr.get("source") != "company_tickers":
             source = idr.get("source", "openfigi")
             ticker = idr["ticker"]
             name = idr.get("name") or s["name"]
@@ -277,7 +280,7 @@ def build_security_reference() -> dict:
     vc = ref["resolution_status"].value_counts().to_dict()
     return {
         "total": len(ref),
-        "resolved": vc.get("resolved", 0) + vc.get("ticker_only", 0),
+        "resolved": vc.get("resolved", 0),
         "ticker_only": vc.get("ticker_only", 0),
         "name_only": vc.get("name_only", 0),
         "unresolved": vc.get("unresolved", 0),

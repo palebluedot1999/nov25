@@ -176,7 +176,13 @@ class TestResolveCusips:
 
 
 class TestBuildSecurityReference:
-    def _setup(self, tmp_path, monkeypatch, identifiers_rows, overrides_text):
+    _DEFAULT_FILING_ROWS = [
+        {"company_name": "Acme Bio Inc.", "cusip": "111111111", "ticker": "", "value": 1, "shares": 1},
+        {"company_name": "Bond Co", "cusip": "00484MAA4", "ticker": "", "value": 1, "shares": 1},
+        {"company_name": "Ghost Inc", "cusip": "222222222", "ticker": "", "value": 1, "shares": 1},
+    ]
+
+    def _setup(self, tmp_path, monkeypatch, identifiers_rows, overrides_text, filing_rows=None):
         monkeypatch.setattr(sr, "SECURITY_REFERENCE_FILE", tmp_path / "security_reference.csv")
         monkeypatch.setattr(sr, "SECURITY_IDENTIFIERS_FILE", tmp_path / "ids.csv")
         monkeypatch.setattr(sr, "SECURITY_OVERRIDES_FILE", tmp_path / "security_overrides.csv")
@@ -186,11 +192,7 @@ class TestBuildSecurityReference:
         filings.mkdir()
         _write_filing(
             filings / "f1.csv",
-            [
-                {"company_name": "Acme Bio Inc.", "cusip": "111111111", "ticker": "", "value": 1, "shares": 1},
-                {"company_name": "Bond Co", "cusip": "00484MAA4", "ticker": "", "value": 1, "shares": 1},
-                {"company_name": "Ghost Inc", "cusip": "222222222", "ticker": "", "value": 1, "shares": 1},
-            ],
+            self._DEFAULT_FILING_ROWS if filing_rows is None else filing_rows,
             "2024-05-15", "2024-03-31",
         )
         monkeypatch.setattr(sr, "FILINGS_DIR", filings)
@@ -218,11 +220,68 @@ class TestBuildSecurityReference:
         assert ref.loc["111111111", "resolution_source"] == "override"
         assert ref.loc["111111111", "resolution_status"] == "ticker_only"
         assert ref.loc["111111111", "isin"] == "US1111111118"
+        assert ref.loc["111111111", "figi"] == ""          # override rows never carry a figi
         # suppression: blank-ticker override beats a confident openfigi hit
         assert ref.loc["00484MAA4", "ticker"] == ""
         assert ref.loc["00484MAA4", "resolution_status"] == "name_only"
+        assert ref.loc["00484MAA4", "resolution_source"] == "override"
         # CINS-safe / unresolved
         assert ref.loc["222222222", "resolution_status"] == "unresolved"
         assert ref.loc["222222222", "ticker"] == ""
         assert stats["total"] == 3
         assert stats["unresolved"] == 1
+
+    def test_ladder_branches_and_status_values(self, tmp_path, monkeypatch):
+        ids = [
+            # OpenFIGI, ticker + figi -> resolved
+            {**{c: "" for c in sr._IDENTIFIER_COLS}, "cusip": "111111111", "ticker": "ACME",
+             "name": "ACME BIO INC", "figi": "BBG1", "source": "openfigi", "resolved_at": "x"},
+            # OpenFIGI, ticker but no figi -> ticker_only
+            {**{c: "" for c in sr._IDENTIFIER_COLS}, "cusip": "222222222", "ticker": "NOFI",
+             "name": "NO FIGI CO", "figi": "", "source": "openfigi", "resolved_at": "x"},
+            # company_tickers fuzzy match, non-empty ticker -> must NOT be promoted
+            {**{c: "" for c in sr._IDENTIFIER_COLS}, "cusip": "333333333", "ticker": "FUZZY",
+             "name": "FUZZY MATCH INC", "figi": "", "source": "company_tickers", "resolved_at": "x"},
+        ]
+        overrides = (
+            "# cusip,ticker,name,security_type,cik,note\n"
+            "cusip,ticker,name,security_type,cik,note\n"
+        )
+        filing_rows = [
+            {"company_name": "Acme Bio Inc.", "cusip": "111111111", "ticker": "", "value": 1, "shares": 1},
+            {"company_name": "No Figi Co", "cusip": "222222222", "ticker": "", "value": 1, "shares": 1},
+            {"company_name": "Fuzzy Match Inc", "cusip": "333333333", "ticker": "", "value": 1, "shares": 1},
+            # no identifier row, no override, but a ticker present in the filing -> filing fallback
+            {"company_name": "Filing Only Corp", "cusip": "444444444", "ticker": "FILE", "value": 1, "shares": 1},
+        ]
+        self._setup(tmp_path, monkeypatch, ids, overrides, filing_rows=filing_rows)
+
+        stats = sr.build_security_reference()
+        ref = sr.load_security_reference().set_index("cusip")
+
+        # resolved: OpenFIGI ticker + figi, no override
+        assert ref.loc["111111111", "resolution_status"] == "resolved"
+        assert ref.loc["111111111", "resolution_source"] == "openfigi"
+        assert ref.loc["111111111", "figi"] != ""
+        assert ref.loc["111111111", "ticker"] == "ACME"
+
+        # plain OpenFIGI ticker_only: ticker but no figi
+        assert ref.loc["222222222", "resolution_status"] == "ticker_only"
+        assert ref.loc["222222222", "resolution_source"] == "openfigi"
+        assert ref.loc["222222222", "ticker"] == "NOFI"
+
+        # company_tickers fuzzy match is NOT promoted into the reference
+        assert ref.loc["333333333", "ticker"] == ""
+        assert ref.loc["333333333", "resolution_status"] == "name_only"
+        assert ref.loc["333333333", "resolution_source"] == "company_tickers"
+
+        # filing fallback: no identifier / override, ticker taken from the filing
+        assert ref.loc["444444444", "resolution_source"] == "filing"
+        assert ref.loc["444444444", "resolution_status"] == "ticker_only"
+        assert ref.loc["444444444", "ticker"] == "FILE"
+
+        assert stats["total"] == 4
+        assert stats["resolved"] == 1
+        assert stats["ticker_only"] == 2
+        assert stats["name_only"] == 1
+        assert stats["unresolved"] == 0
