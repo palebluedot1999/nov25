@@ -4,7 +4,12 @@ Updated to work with new database schema (portfolios, securities, holdings).
 """
 
 import requests
-import xml.etree.ElementTree as ET
+# 13F XML comes straight from the SEC over the wire; parse it with defusedxml so a
+# hostile or corrupted filing can't trigger entity-expansion / billion-laughs DoS.
+# defusedxml.ElementTree is a drop-in for xml.etree.ElementTree (fromstring,
+# ParseError, ...) and rejects DTDs / internal entities / external references.
+import defusedxml.ElementTree as ET
+from defusedxml import DefusedXmlException
 import pandas as pd
 import time
 import re
@@ -181,6 +186,10 @@ class SECEdgarScraper:
 
         except ET.ParseError as e:
             print(f"XML parsing error: {e}")
+        except DefusedXmlException as e:
+            # DTD / internal entity / external reference in the filing — refused
+            # before any expansion. Treat as an unparseable filing.
+            print(f"Refused unsafe XML (entity expansion / DTD): {e}")
 
         return holdings
 
