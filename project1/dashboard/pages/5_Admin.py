@@ -128,6 +128,8 @@ with tab_processing:
     with col2:
         if st.button("Consolidate securities"):
             run_script("consolidate_securities.py", "Consolidate securities")
+        if st.button("Build security reference"):
+            run_script("build_security_reference.py", "Build security reference")
         portfolios = load_portfolios(portfolio_type="fund")
         if not portfolios.empty:
             for _, p in portfolios.iterrows():
@@ -136,6 +138,16 @@ with tab_processing:
                     with st.spinner("Computing..."):
                         compute_and_save_qoq_changes(p["id"])
                     st.success(f"QoQ changes computed for {p['name']}")
+
+    from utils.security_reference import load_security_reference
+    _ref = load_security_reference()
+    if not _ref.empty:
+        _vc = _ref["resolution_status"].value_counts()
+        _has_ticker = int(_vc.get("resolved", 0) + _vc.get("ticker_only", 0))
+        st.caption(f"security_reference.csv: {len(_ref)} CUSIPs — "
+                   f"{int(_vc.get('resolved', 0))} resolved, {int(_vc.get('ticker_only', 0))} ticker-only, "
+                   f"{int(_vc.get('name_only', 0))} name-only, {int(_vc.get('unresolved', 0))} unresolved "
+                   f"({_has_ticker} with a usable ticker)")
 
 # ── Advanced ───────────────────────────────────────────────────────────────────
 with tab_advanced:

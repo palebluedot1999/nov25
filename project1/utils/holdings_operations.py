@@ -6,11 +6,12 @@ joins with price data, and calculates position values.
 """
 
 import pandas as pd
-import numpy as np
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
 import logging
+
+from utils.security_reference import enrich_holdings_with_reference
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -18,59 +19,22 @@ logger = logging.getLogger(__name__)
 
 # File paths
 PROJECT_ROOT = Path(__file__).parent.parent
-CUSIP_CACHE_FILE = PROJECT_ROOT / "data" / "raw" / "cusip_cache.csv"
 FILINGS_DIR = PROJECT_ROOT / "data" / "raw" / "13f_filings"
 PRICES_FILE = PROJECT_ROOT / "data" / "processed" / "prices.csv"
 
 
-def resolve_tickers_from_cusip_cache(holdings_df: pd.DataFrame) -> pd.DataFrame:
+def resolve_tickers_from_reference(holdings_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Resolve missing tickers from CUSIP cache.
+    Fill blank tickers and add name/resolution_status from security_reference.csv.
 
     Args:
         holdings_df: DataFrame with 'ticker' and 'cusip' columns
 
     Returns:
-        DataFrame with resolved tickers (empty tickers filled where possible)
+        DataFrame with blank tickers filled where possible (blank ticker stays "",
+        never NaN) plus 'name' and 'resolution_status' columns.
     """
-    # Load CUSIP cache
-    if not CUSIP_CACHE_FILE.exists():
-        logger.warning(f"CUSIP cache not found at {CUSIP_CACHE_FILE}")
-        return holdings_df
-
-    cusip_cache = pd.read_csv(CUSIP_CACHE_FILE)
-
-    # Count missing tickers before resolution
-    missing_before = holdings_df['ticker'].isna().sum() + (holdings_df['ticker'] == '').sum()
-
-    # Create a copy to avoid modifying original
-    df = holdings_df.copy()
-
-    # Fill empty strings with NaN for consistency
-    df.loc[df['ticker'] == '', 'ticker'] = np.nan
-
-    # Left join to fill missing tickers
-    # Only update rows where ticker is missing
-    missing_mask = df['ticker'].isna()
-    if missing_mask.any():
-        df.loc[missing_mask, 'ticker'] = df.loc[missing_mask].merge(
-            cusip_cache[['cusip', 'ticker']],
-            on='cusip',
-            how='left',
-            suffixes=('', '_new')
-        )['ticker_new']
-
-    # Count missing tickers after resolution
-    missing_after = df['ticker'].isna().sum()
-    resolved_count = missing_before - missing_after
-
-    if resolved_count > 0:
-        logger.info(f"Resolved {resolved_count} tickers from CUSIP cache")
-    if missing_after > 0:
-        unresolved_cusips = df[df['ticker'].isna()]['cusip'].unique()
-        logger.warning(f"{missing_after} tickers still unresolved. CUSIPs: {unresolved_cusips[:5]}...")
-
-    return df
+    return enrich_holdings_with_reference(holdings_df)
 
 
 def detect_position_exits(current_filing_df: pd.DataFrame, next_filing_df: pd.DataFrame) -> List[str]:
@@ -82,17 +46,17 @@ def detect_position_exits(current_filing_df: pd.DataFrame, next_filing_df: pd.Da
         next_filing_df: Holdings from filing N+1
 
     Returns:
-        List of tickers that appear in current but not in next filing
+        List of CUSIPs that appear in current but not in next filing
     """
-    current_tickers = set(current_filing_df['ticker'].dropna())
-    next_tickers = set(next_filing_df['ticker'].dropna())
+    current_cusips = set(current_filing_df['cusip'].dropna())
+    next_cusips = set(next_filing_df['cusip'].dropna())
 
-    exited_tickers = current_tickers - next_tickers
+    exited_cusips = current_cusips - next_cusips
 
-    if exited_tickers:
-        logger.info(f"Detected {len(exited_tickers)} position exits: {sorted(exited_tickers)[:10]}...")
+    if exited_cusips:
+        logger.info(f"Detected {len(exited_cusips)} position exits: {sorted(exited_cusips)[:10]}...")
 
-    return list(exited_tickers)
+    return list(exited_cusips)
 
 
 def process_quarterly_filings_to_daily_holdings(
@@ -107,7 +71,8 @@ def process_quarterly_filings_to_daily_holdings(
     1. Load all 13F filing CSVs for portfolio
     2. Sort by period_end_date ascending
     3. For each filing:
-        - Resolve missing tickers from cusip_cache
+        - Fill blank tickers from security_reference.csv (positions with no
+          ticker are still kept, keyed by CUSIP)
         - Determine date range (period_end → next_period_end - 1 day)
         - Create daily records for all dates in range
         - For positions that exited: add shares=0 record on next period_end
@@ -119,7 +84,7 @@ def process_quarterly_filings_to_daily_holdings(
         end_date: End date for holdings (defaults to today)
 
     Returns:
-        DataFrame with columns: portfolio, ticker, cusip, shares, eod_date
+        DataFrame with columns: portfolio, cusip, ticker, shares, filing_value, eod_date
     """
     logger.info(f"Processing {portfolio_id} filings to daily holdings...")
 
@@ -139,7 +104,7 @@ def process_quarterly_filings_to_daily_holdings(
     filings = []
     for file in filing_files:
         df = pd.read_csv(file)
-        df = resolve_tickers_from_cusip_cache(df)
+        df = resolve_tickers_from_reference(df)
         filings.append(df)
 
     # Sort by period_end_date
@@ -171,12 +136,12 @@ def process_quarterly_filings_to_daily_holdings(
         logger.info(f"Filing {i+1}/{len(filings)}: {period_end} (filing_date: {filing_date})")
         logger.info(f"  Forward-filling {len(filing_df)} positions from {range_start} to {range_end}")
 
-        # Filter to valid tickers only (skip unresolved)
-        valid_holdings = filing_df[filing_df['ticker'].notna()].copy()
-
-        if len(valid_holdings) < len(filing_df):
-            skipped = len(filing_df) - len(valid_holdings)
-            logger.warning(f"  Skipping {skipped} positions with unresolved tickers")
+        # Keep every position; unresolved ones carry a blank ticker + their filing value.
+        valid_holdings = filing_df.copy()
+        valid_holdings['ticker'] = valid_holdings['ticker'].fillna('').astype(str)
+        unresolved = int((valid_holdings['ticker'] == '').sum())
+        if unresolved:
+            logger.info(f"  {unresolved} positions have no ticker yet (kept, keyed by CUSIP)")
 
         # Create date range
         date_range = pd.date_range(start=range_start, end=range_end, freq='D')
@@ -189,6 +154,7 @@ def process_quarterly_filings_to_daily_holdings(
                 'ticker': row['ticker'],
                 'cusip': row['cusip'],
                 'shares': row['shares'],
+                'filing_value': row['value'],
                 'eod_date': date_range
             })
             daily_records.append(ticker_df)
@@ -200,22 +166,20 @@ def process_quarterly_filings_to_daily_holdings(
         # Detect position exits and add shares=0 records on next period_end
         if i < len(filings) - 1:
             next_filing_df = filings[i + 1]
-            exited_tickers = detect_position_exits(valid_holdings, next_filing_df)
+            exited_cusips = detect_position_exits(valid_holdings, next_filing_df)
 
-            if exited_tickers:
+            if exited_cusips:
                 next_period_end = next_filing_df['period_end_date'].iloc[0]
 
                 # Create shares=0 records for exited positions
                 exit_records = []
-                for ticker in exited_tickers:
-                    # Get CUSIP for this ticker from current filing
-                    cusip = valid_holdings[valid_holdings['ticker'] == ticker]['cusip'].iloc[0]
-
+                for exited_cusip in exited_cusips:
                     exit_df = pd.DataFrame({
                         'portfolio': [portfolio_id],
-                        'ticker': [ticker],
-                        'cusip': [cusip],
+                        'ticker': [''],
+                        'cusip': [exited_cusip],
                         'shares': [0.0],
+                        'filing_value': [0.0],
                         'eod_date': [pd.to_datetime(next_period_end)]
                     })
                     exit_records.append(exit_df)
@@ -335,12 +299,18 @@ def calculate_portfolio_values(
 
     Formula: position_value = shares × close_price
 
+    Uses a LEFT join on [ticker, eod_date] so unpriced positions (price gaps,
+    blank tickers) are kept rather than dropped. A boolean `has_price` column
+    flags which rows matched a price; `position_value` is NaN where no close.
+
     Args:
-        holdings_df: DataFrame with columns: portfolio, ticker, cusip, shares, eod_date
+        holdings_df: DataFrame with columns: portfolio, cusip, ticker, shares,
+            filing_value, eod_date
         prices_df: DataFrame with columns: ticker, date, close
 
     Returns:
-        DataFrame with columns: eod_date, ticker, shares, close, position_value
+        DataFrame with columns: eod_date, cusip, ticker, shares, filing_value,
+        close, has_price, position_value. Rows are never dropped.
     """
     logger.info("Calculating position values...")
 
@@ -350,27 +320,23 @@ def calculate_portfolio_values(
         prices_df,
         left_on=['ticker', 'eod_date'],
         right_on=['ticker', 'date'],
-        how='inner'
+        how='left',
     )
 
-    # Calculate position value
-    merged['position_value'] = merged['shares'] * merged['close']
+    merged['has_price'] = merged['close'].notna()
+    merged['position_value'] = merged['shares'] * merged['close']   # NaN where no close
 
-    # Check for missing price data
-    total_holdings = len(holdings_df)
-    matched_holdings = len(merged)
-    missing_pct = (total_holdings - matched_holdings) / total_holdings * 100
-
-    if missing_pct > 5:
-        logger.warning(f"Missing price data for {missing_pct:.1f}% of holdings")
+    total = len(holdings_df)
+    unpriced = int((~merged['has_price']).sum())
+    if total and (unpriced / total * 100) > 5:
+        logger.warning(f"{unpriced} position-days unpriced (kept, position_value=NaN)")
 
     logger.info(f"Calculated {len(merged):,} position values")
-    logger.info(f"  Holdings with prices: {matched_holdings:,} / {total_holdings:,} ({100-missing_pct:.1f}%)")
+    logger.info(f"  Holdings with prices: {total - unpriced:,} / {total:,}")
 
-    # Return relevant columns
-    result = merged[['eod_date', 'ticker', 'cusip', 'shares', 'close', 'position_value']].copy()
-
-    return result
+    cols = ['eod_date', 'cusip', 'ticker', 'shares', 'filing_value', 'close',
+            'has_price', 'position_value']
+    return merged[[c for c in cols if c in merged.columns]].copy()
 
 
 def save_processed_holdings(holdings_df: pd.DataFrame, output_file: Path) -> None:
@@ -381,6 +347,11 @@ def save_processed_holdings(holdings_df: pd.DataFrame, output_file: Path) -> Non
     - Convert ticker to categorical dtype (reduces memory)
     - Sort by eod_date, ticker for efficient queries
     - Add metadata comment to file header
+
+    Persisted columns (exactly, in this order): portfolio, cusip, ticker,
+    shares, filing_value, eod_date. The file stays PRICE-FREE — has_price /
+    close / position_value are produced by calculate_portfolio_values at
+    consume time and never persisted. Blank ticker is written as '' never NaN.
 
     Args:
         holdings_df: DataFrame to save
@@ -393,6 +364,13 @@ def save_processed_holdings(holdings_df: pd.DataFrame, output_file: Path) -> Non
 
     # Optimize data types
     df = holdings_df.copy()
+    df['ticker'] = df['ticker'].fillna('').astype(str)
+    assert not df['ticker'].isna().any(), "blank ticker must be '' not NaN"
+
+    # Enforce the spec column order regardless of caller's column order.
+    keep = ['portfolio', 'cusip', 'ticker', 'shares', 'filing_value', 'eod_date']
+    df = df[keep]
+
     df['ticker'] = df['ticker'].astype('category')
     df['portfolio'] = df['portfolio'].astype('category')
 

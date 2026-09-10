@@ -3,10 +3,13 @@ CSV-based data layer for portfolio tracking.
 Replaces database.py with simple CSV file operations.
 """
 
+import re
 import pandas as pd
 from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
+
+from utils.security_reference import enrich_holdings_with_reference
 
 # Paths
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -120,6 +123,9 @@ def load_latest_holdings(portfolio_id: str) -> pd.DataFrame:
     if df.empty:
         return df
 
+    if not df.empty:
+        df = enrich_holdings_with_reference(df)
+
     # Calculate weight
     total_value = df['value'].sum()
     if total_value > 0:
@@ -150,6 +156,9 @@ def load_holdings_by_date(portfolio_id: str, filing_date: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.read_csv(filepath)
+
+    if not df.empty:
+        df = enrich_holdings_with_reference(df)
 
     # Calculate weight and value_millions
     if not df.empty:
@@ -196,7 +205,10 @@ def load_processed_holdings(portfolio_id: str, start_date: Optional[str] = None)
         start_date: Optional start date (YYYY-MM-DD) to filter from
 
     Returns:
-        DataFrame with columns: portfolio, ticker, cusip, shares, eod_date
+        DataFrame with columns: portfolio, cusip, ticker, shares, filing_value, eod_date,
+        plus name and resolution_status left-joined from security_reference.csv.
+        Degrades gracefully when security_reference.csv is absent: name is present but
+        empty and resolution_status is "unresolved" (never raises).
     """
     if not PROCESSED_HOLDINGS_FILE.exists():
         return pd.DataFrame()
@@ -209,6 +221,9 @@ def load_processed_holdings(portfolio_id: str, start_date: Optional[str] = None)
     # Filter by start date if provided
     if start_date:
         df = df[df['eod_date'] >= start_date]
+
+    if not df.empty:
+        df = enrich_holdings_with_reference(df)
 
     return df
 
@@ -241,6 +256,31 @@ def get_all_filings(portfolio_id: str) -> pd.DataFrame:
 # PRICES
 # ============================================================================
 
+_TICKER_FILENAME_RE = re.compile(r"[A-Z0-9][A-Z0-9.\-]{0,19}")
+
+
+def _sanitize_ticker_for_filename(ticker: str) -> str:
+    """Normalize and validate a ticker before it is used to build a file path.
+
+    Price data is stored one CSV per ticker (``<PRICES_DIR>/<ticker>.csv``), and
+    the ticker reaches here from filings, third-party APIs, and dashboard input.
+    Restrict it to an allowlist so it can never contain a path separator or
+    traversal sequence.
+
+    Allowed: 1-20 chars, uppercase letters / digits / ``.`` / ``-``, not
+    starting with ``.`` or ``-``. Returns the normalized (stripped, upper-cased)
+    ticker; raises ``ValueError`` on anything else.
+    """
+    if not isinstance(ticker, str):
+        raise ValueError(f"ticker must be a string, got {type(ticker).__name__}")
+    normalized = ticker.strip().upper()
+    if not normalized:
+        raise ValueError("ticker must not be empty")
+    if not _TICKER_FILENAME_RE.fullmatch(normalized):
+        raise ValueError(f"invalid ticker for a filename: {ticker!r}")
+    return normalized
+
+
 def load_prices(ticker: str, start_date: Optional[str] = None) -> pd.DataFrame:
     """
     Load price history for a ticker.
@@ -255,7 +295,7 @@ def load_prices(ticker: str, start_date: Optional[str] = None) -> pd.DataFrame:
     if not PRICES_DIR.exists():
         return pd.DataFrame()
 
-    filepath = PRICES_DIR / f"{ticker}.csv"
+    filepath = PRICES_DIR / f"{_sanitize_ticker_for_filename(ticker)}.csv"
 
     if not filepath.exists():
         return pd.DataFrame()
@@ -279,12 +319,13 @@ def save_prices(ticker: str, prices_df: pd.DataFrame):
         ticker: Stock ticker
         prices_df: DataFrame with columns: date, open, high, low, close, adj_close, volume
     """
+    safe_ticker = _sanitize_ticker_for_filename(ticker)
     PRICES_DIR.mkdir(parents=True, exist_ok=True)
-    filepath = PRICES_DIR / f"{ticker}.csv"
+    filepath = PRICES_DIR / f"{safe_ticker}.csv"
 
     # Add ticker column and fetched_at
     prices_df = prices_df.copy()
-    prices_df['ticker'] = ticker
+    prices_df['ticker'] = safe_ticker
     prices_df['fetched_at'] = datetime.now().isoformat()
 
     # Load existing if present
